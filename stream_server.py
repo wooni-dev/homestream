@@ -278,21 +278,40 @@ def run_gui(server, ip):
         server.shutdown()      # serve_forever 루프 종료(별도 스레드에서 동작 중)
         root.destroy()
 
+    url_text = f"http://{ip}:{PORT}/"
+
     root = tk.Tk()
     root.title("USB 영상 스트리밍")
     root.configure(bg="#0e0e12")
     root.resizable(False, False)
+    try:
+        root.iconbitmap(os.path.join(_BASE_DIR, "tv.ico"))   # 창/작업표시줄 아이콘
+    except Exception:
+        pass
 
     tk.Label(root, text="폰에서 아래 주소로 접속하세요", bg="#0e0e12", fg="#9a9aae",
              font=("Segoe UI", 10)).pack(padx=30, pady=(22, 8))
 
-    # 주소: 읽기전용 입력칸이라 마우스로 선택·복사 가능
+    # 주소: 읽기전용 입력칸이라 마우스로 선택·복사 가능.
+    # 너비를 주소 길이에 맞춰 잘리지 않고 한 번에 다 보이게 한다.
     url = tk.Entry(root, justify="center", relief="flat", state="normal",
                    readonlybackground="#191922", fg="#8a8aff", disabledforeground="#8a8aff",
-                   font=("Consolas", 15, "bold"), width=24)
-    url.insert(0, f"http://{ip}:{PORT}/")
+                   font=("Consolas", 15, "bold"), width=len(url_text) + 2)
+    url.insert(0, url_text)
     url.configure(state="readonly")
     url.pack(padx=30, pady=4, ipady=8)
+
+    def copy_url():
+        root.clipboard_clear()
+        root.clipboard_append(url_text)
+        copy_btn.configure(text="복사됨!", bg="#3aa76d")
+        root.after(1500, lambda: copy_btn.configure(text="주소 복사", bg="#8a8aff"))
+
+    copy_btn = tk.Button(root, text="주소 복사", command=copy_url,
+                         bg="#8a8aff", fg="#0e0e12", activebackground="#a3a3ff",
+                         activeforeground="#0e0e12", relief="flat", cursor="hand2",
+                         font=("Segoe UI", 10, "bold"))
+    copy_btn.pack(padx=30, pady=(10, 4), ipadx=12, ipady=6, fill="x")
 
     tk.Label(root, text="이 창을 X(닫기)로 닫으면 서버가 꺼집니다", bg="#0e0e12",
              fg="#55556a", font=("Segoe UI", 8)).pack(pady=(8, 22))
