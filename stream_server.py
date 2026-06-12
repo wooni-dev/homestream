@@ -460,14 +460,26 @@ def _account_settings_dialog(parent):
 
 
 def _start_server(serve_dir):
-    """serve_dir 로 ThreadingHTTPServer 를 만들고 백그라운드에서 시작한다."""
+    """serve_dir 로 ThreadingHTTPServer 를 만들고 백그라운드에서 시작한다.
+
+    PORT 부터 최대 9개 포트를 순서대로 시도해 첫 번째 빈 포트를 사용한다.
+    (server, actual_port) 튜플을 반환한다.
+    """
     handler = partial(StreamHandler, directory=serve_dir)
-    server = http.server.ThreadingHTTPServer((HOST, PORT), handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server
+    for port in range(PORT, PORT + 10):
+        try:
+            server = http.server.ThreadingHTTPServer((HOST, port), handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            return server, port
+        except OSError:
+            continue
+    raise OSError(_s(
+        f"포트 {PORT}~{PORT + 9} 가 모두 사용 중입니다. 다른 앱을 종료 후 다시 실행하세요.",
+        f"Ports {PORT}–{PORT + 9} are all in use. Close other apps and try again.",
+    ))
 
 
-def run_gui(state, ip):
+def run_gui(state, ip, port):
     """접속 주소와 현재 폴더를 보여주는 창.
 
     state = {"server": ThreadingHTTPServer, "serve_dir": str}
@@ -476,7 +488,7 @@ def run_gui(state, ip):
     import tkinter as tk
     from tkinter import filedialog
 
-    url_text = f"http://{ip}:{PORT}/"
+    url_text = f"http://{ip}:{port}/"
 
     root = tk.Tk()
     root.title(_s("홈 스트리밍", "Home Streaming"))
@@ -504,7 +516,7 @@ def run_gui(state, ip):
         state["server"].server_close()
         save_user_config(new_dir, AUTH_USER, AUTH_PASS)
         state["serve_dir"] = new_dir
-        state["server"] = _start_server(new_dir)
+        state["server"], _ = _start_server(new_dir)
         dir_label.configure(text=_short_path(new_dir))
 
     tk.Label(root, text=_s("폰에서 아래 주소로 접속하세요", "Open this address on your phone"), bg="#0e0e12", fg="#9a9aae",
@@ -578,9 +590,10 @@ def main():
             return  # 취소 시 종료
         save_user_config(serve_dir, AUTH_USER, AUTH_PASS)
 
-    state = {"serve_dir": serve_dir, "server": _start_server(serve_dir)}
+    server, port = _start_server(serve_dir)
+    state = {"serve_dir": serve_dir, "server": server}
     ip = get_lan_ip()
-    run_gui(state, ip)
+    run_gui(state, ip, port)
     state["server"].server_close()
 
 
