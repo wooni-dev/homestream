@@ -28,33 +28,12 @@ _IS_KO = _lang.startswith("ko")
 def _s(ko, en):
     return ko if _IS_KO else en
 
-def load_env(path):
-    """간단한 .env 로더: KEY=VALUE 형식, '#' 주석·빈 줄 무시. 표준 라이브러리만 사용.
-
-    실제 환경 변수가 이미 있으면 그것을 우선한다(.env 는 기본값 역할).
-    """
-    try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, val = line.partition("=")
-                os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
-    except FileNotFoundError:
-        pass
-
-
 if getattr(sys, "frozen", False):
-    # PyInstaller exe: 빌드 시 함께 넣은 .env 를 exe 내부 임시 폴더에서 읽는다.
     _BASE_DIR = sys._MEIPASS
-    # 사용자 설정은 exe 옆 폴더에 저장 (읽기/쓰기 가능)
     _USER_CONFIG_DIR = os.path.dirname(sys.executable)
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     _USER_CONFIG_DIR = _BASE_DIR
-
-load_env(os.path.join(_BASE_DIR, ".env"))
 
 _USER_CONFIG_FILE = os.path.join(_USER_CONFIG_DIR, "homestream.cfg")
 

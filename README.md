@@ -69,7 +69,7 @@ AUTH_PASS=
 | `AUTH_USER` | 접속 아이디 (기본 `admin`) |
 | `AUTH_PASS` | 접속 비밀번호. 비우면 인증 비활성화 |
 
-> 설정 우선순위: **환경변수 > `homestream.cfg` > `.env` 기본값**
+> 설정 우선순위: **환경변수 > `homestream.cfg`**
 
 ---
 
@@ -107,7 +107,6 @@ python tasks.py build
 | `stream_server.py` | 스트리밍 서버 + GUI (메인) |
 | `stream_server.spec` | PyInstaller 빌드 설정 |
 | `tasks.py` | 빌드·실행 태스크 러너 (`python tasks.py build/run`) |
-| `.env` / `.env.example` | 빌드 시 번들되는 기본값 설정 |
 | `homestream.cfg` / `homestream.cfg.example` | 사용자 런타임 설정 (GUI 저장값) |
 
 ---
