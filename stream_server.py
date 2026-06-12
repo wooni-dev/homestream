@@ -1,4 +1,4 @@
-﻿"""같은 Wi-Fi의 휴대폰에서 USB 폴더의 영상을 스트리밍하기 위한 HTTP 서버.
+"""같은 Wi-Fi의 휴대폰에서 USB 폴더의 영상을 스트리밍하기 위한 HTTP 서버.
 
 - 커스텀 모바일 UI: 폴더 탐색 + 전용 영상 플레이어 (다크 테마)
 - HTTP Range(구간 요청) 지원: 영상 재생/탐색(seek)이 모바일에서 정상 동작
@@ -11,12 +11,22 @@ import hmac
 import html
 import http.server
 import io
+import locale
 import os
 import socket
 import sys
 import threading
 from functools import partial
 from urllib.parse import quote, unquote, urlsplit, parse_qs
+
+try:
+    _lang = (locale.getdefaultlocale()[0] or "").lower()
+except Exception:
+    _lang = ""
+_IS_KO = _lang.startswith("ko")
+
+def _s(ko, en):
+    return ko if _IS_KO else en
 
 def load_env(path):
     """간단한 .env 로더: KEY=VALUE 형식, '#' 주석·빈 줄 무시. 표준 라이브러리만 사용.
@@ -38,19 +48,66 @@ def load_env(path):
 if getattr(sys, "frozen", False):
     # PyInstaller exe: 빌드 시 함께 넣은 .env 를 exe 내부 임시 폴더에서 읽는다.
     _BASE_DIR = sys._MEIPASS
+    # 사용자 설정은 exe 옆 폴더에 저장 (읽기/쓰기 가능)
+    _USER_CONFIG_DIR = os.path.dirname(sys.executable)
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    _USER_CONFIG_DIR = _BASE_DIR
+
 load_env(os.path.join(_BASE_DIR, ".env"))
+
+_USER_CONFIG_FILE = os.path.join(_USER_CONFIG_DIR, "homestream.cfg")
 
 # ===== 설정 =====
 HOST = "0.0.0.0"
 PORT = 8000
-SERVE_DIR = os.environ.get("SERVE_DIR", r"E:\PUA\리비도\러스트스쿨\리비도 훈련 프로그램")
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
 
 # 접속 비밀번호. AUTH_PASS 가 비어 있으면 인증 없이 동작(같은 Wi-Fi 전용).
 AUTH_USER = os.environ.get("AUTH_USER", "admin")
 AUTH_PASS = os.environ.get("AUTH_PASS", "")
+
+
+def _init_user_config():
+    """homestream.cfg 없으면 example에서 자동 복사."""
+    if not os.path.exists(_USER_CONFIG_FILE):
+        example = os.path.join(_BASE_DIR, "homestream.cfg.example")
+        if os.path.exists(example):
+            import shutil
+            shutil.copy2(example, _USER_CONFIG_FILE)
+
+
+def load_user_config():
+    """homestream.cfg에서 설정 읽기. dict 반환."""
+    config = {}
+    try:
+        with open(_USER_CONFIG_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                config[key.strip()] = val.strip()
+    except FileNotFoundError:
+        pass
+    return config
+
+
+def save_user_config(serve_dir, auth_user="", auth_pass=""):
+    """설정을 homestream.cfg에 저장."""
+    with open(_USER_CONFIG_FILE, "w", encoding="utf-8") as f:
+        f.write(f"SERVE_DIR={serve_dir}\n")
+        f.write(f"AUTH_USER={auth_user}\n")
+        f.write(f"AUTH_PASS={auth_pass}\n")
+
+
+def _short_path(path, max_len=42):
+    if len(path) <= max_len:
+        return path
+    parts = path.replace("\\", "/").split("/")
+    if len(parts) > 2:
+        return ".../" + "/".join(parts[-2:])
+    return path
 
 
 def human_size(n):
@@ -118,7 +175,7 @@ def render_listing(disp_path, dirs, vids):
             f'<div class="chev">&rsaquo;</div></a>'
         )
     body = "".join(rows) if rows else '<div class="empty">이 폴더에 영상이 없습니다</div>'
-    title = parts[-1] if parts else "리비도 훈련 프로그램"
+    title = parts[-1] if parts else "홈"
     count = f"폴더 {len(dirs)} · 영상 {len(vids)}"
 
     return f"""<!DOCTYPE html><html lang="ko"><head>
@@ -270,30 +327,210 @@ def get_lan_ip():
         s.close()
 
 
-def run_gui(server, ip):
-    """접속 주소만 보여주는 작은 창. 창을 X(닫기)로 닫으면 서버를 멈춘다."""
-    import tkinter as tk
+def _ask_serve_dir(stale_path=None):
+    """경로 직접 입력 or 찾아보기 다이얼로그.
 
-    def stop():
-        server.shutdown()      # serve_forever 루프 종료(별도 스레드에서 동작 중)
-        root.destroy()
+    stale_path: 이전에 저장됐지만 지금 없는 경로 (있으면 입력칸에 미리 채워줌).
+    확인 시 경로 유효성 검사 → 없으면 에러 메시지 유지, 있으면 경로 반환.
+    취소하면 None 반환.
+    """
+    import tkinter as tk
+    from tkinter import filedialog, messagebox
+
+    result = [None]
+
+    dlg = tk.Tk()
+    dlg.title(_s("영상 폴더 설정", "Video Folder Settings"))
+    dlg.configure(bg="#0e0e12")
+    dlg.resizable(False, False)
+    try:
+        dlg.iconbitmap(os.path.join(_BASE_DIR, "tv.ico"))
+    except Exception:
+        pass
+
+    if stale_path:
+        tk.Label(dlg, text=_s(f"저장된 폴더를 찾을 수 없습니다:\n{stale_path}",
+                              f"Saved folder not found:\n{stale_path}"),
+                 bg="#0e0e12", fg="#ff6b6b", font=("Segoe UI", 9),
+                 wraplength=320, justify="left").pack(padx=24, pady=(20, 4))
+
+    tk.Label(dlg, text=_s("스트리밍할 영상 폴더 경로를 입력하거나 선택하세요",
+                           "Enter or browse to the video folder"),
+             bg="#0e0e12", fg="#9a9aae", font=("Segoe UI", 9)
+             ).pack(padx=24, pady=(16 if not stale_path else 6, 6))
+
+    row = tk.Frame(dlg, bg="#0e0e12")
+    row.pack(padx=24, pady=4, fill="x")
+
+    entry = tk.Entry(row, bg="#191922", fg="#ececf1", insertbackground="#8a8aff",
+                     relief="flat", font=("Segoe UI", 10), width=38)
+    entry.pack(side="left", ipady=7, fill="x", expand=True)
+    if stale_path:
+        entry.insert(0, stale_path)
+
+    def browse():
+        initial = entry.get().strip() or os.path.expanduser("~")
+        picked = filedialog.askdirectory(title=_s("폴더 선택", "Select Folder"), initialdir=initial, parent=dlg)
+        if picked:
+            entry.delete(0, "end")
+            entry.insert(0, picked)
+
+    tk.Button(row, text=_s("찾아보기", "Browse"), command=browse,
+              bg="#2a2540", fg="#8a8aff", activebackground="#3a3560",
+              activeforeground="#a3a3ff", relief="flat", cursor="hand2",
+              font=("Segoe UI", 9)).pack(side="left", padx=(6, 0), ipady=7, ipadx=10)
+
+    def confirm():
+        path = entry.get().strip()
+        if not path:
+            messagebox.showwarning(_s("경로 없음", "No Path"),
+                                   _s("폴더 경로를 입력하세요.", "Please enter a folder path."), parent=dlg)
+            return
+        if not os.path.isdir(path):
+            messagebox.showerror(_s("폴더 없음", "Folder Not Found"),
+                                 _s(f"해당 경로를 찾을 수 없습니다:\n{path}",
+                                    f"The folder could not be found:\n{path}"), parent=dlg)
+            return
+        result[0] = path
+        dlg.destroy()
+
+    def cancel():
+        dlg.destroy()
+
+    btns = tk.Frame(dlg, bg="#0e0e12")
+    btns.pack(padx=24, pady=(14, 24), fill="x")
+
+    tk.Button(btns, text=_s("취소", "Cancel"), command=cancel,
+              bg="#23232c", fg="#9a9aae", activebackground="#2a2a36",
+              relief="flat", cursor="hand2", font=("Segoe UI", 9)
+              ).pack(side="right", padx=(6, 0), ipadx=14, ipady=6)
+
+    tk.Button(btns, text=_s("확인", "OK"), command=confirm,
+              bg="#8a8aff", fg="#0e0e12", activebackground="#a3a3ff",
+              activeforeground="#0e0e12", relief="flat", cursor="hand2",
+              font=("Segoe UI", 10, "bold")
+              ).pack(side="right", ipadx=18, ipady=6)
+
+    dlg.bind("<Return>", lambda e: confirm())
+    dlg.protocol("WM_DELETE_WINDOW", cancel)
+    dlg.mainloop()
+
+    return result[0]
+
+
+def _account_settings_dialog(parent):
+    """계정 설정 다이얼로그. 저장 시 AUTH_USER/AUTH_PASS 전역 갱신."""
+    import tkinter as tk
+    global AUTH_USER, AUTH_PASS
+
+    dlg = tk.Toplevel(parent)
+    dlg.title(_s("계정 설정", "Account Settings"))
+    dlg.configure(bg="#0e0e12")
+    dlg.resizable(False, False)
+    dlg.grab_set()
+
+    tk.Label(dlg, text=_s("접속 계정 설정", "Account Settings"), bg="#0e0e12", fg="#ececf1",
+             font=("Segoe UI", 11, "bold")).pack(padx=24, pady=(20, 2))
+    tk.Label(dlg, text=_s("비밀번호를 비워두면 인증 없이 접속 가능합니다",
+                           "Leave password empty to allow access without authentication"),
+             bg="#0e0e12", fg="#55556a", font=("Segoe UI", 8)).pack(padx=24, pady=(0, 14))
+
+    def labeled_entry(label, default="", show=""):
+        tk.Label(dlg, text=label, bg="#0e0e12", fg="#9a9aae",
+                 font=("Segoe UI", 9), anchor="w").pack(padx=24, fill="x")
+        e = tk.Entry(dlg, bg="#191922", fg="#ececf1", insertbackground="#8a8aff",
+                     relief="flat", font=("Segoe UI", 10), show=show)
+        e.insert(0, default)
+        e.pack(padx=24, pady=(3, 10), ipady=6, fill="x")
+        return e
+
+    user_entry = labeled_entry(_s("아이디", "Username"), AUTH_USER)
+    pass_entry = labeled_entry(_s("비밀번호", "Password"), AUTH_PASS, show="●")
+
+    show_var = tk.BooleanVar(value=False)
+    def toggle_show():
+        pass_entry.configure(show="" if show_var.get() else "●")
+    tk.Checkbutton(dlg, text=_s("비밀번호 표시", "Show password"), variable=show_var, command=toggle_show,
+                   bg="#0e0e12", fg="#9a9aae", activebackground="#0e0e12",
+                   activeforeground="#ececf1", selectcolor="#191922",
+                   font=("Segoe UI", 9), cursor="hand2"
+                   ).pack(padx=24, anchor="w", pady=(0, 8))
+
+    def save():
+        global AUTH_USER, AUTH_PASS
+        AUTH_USER = user_entry.get().strip()
+        AUTH_PASS = pass_entry.get()
+        config = load_user_config()
+        save_user_config(config.get("SERVE_DIR", ""), AUTH_USER, AUTH_PASS)
+        dlg.destroy()
+
+    btns = tk.Frame(dlg, bg="#0e0e12")
+    btns.pack(padx=24, pady=(4, 20), fill="x")
+
+    tk.Button(btns, text=_s("취소", "Cancel"), command=dlg.destroy,
+              bg="#23232c", fg="#9a9aae", activebackground="#2a2a36",
+              relief="flat", cursor="hand2", font=("Segoe UI", 9)
+              ).pack(side="right", padx=(6, 0), ipadx=14, ipady=6)
+    tk.Button(btns, text=_s("저장", "Save"), command=save,
+              bg="#8a8aff", fg="#0e0e12", activebackground="#a3a3ff",
+              activeforeground="#0e0e12", relief="flat", cursor="hand2",
+              font=("Segoe UI", 10, "bold")
+              ).pack(side="right", ipadx=18, ipady=6)
+
+    dlg.bind("<Return>", lambda e: save())
+
+
+def _start_server(serve_dir):
+    """serve_dir 로 ThreadingHTTPServer 를 만들고 백그라운드에서 시작한다."""
+    handler = partial(StreamHandler, directory=serve_dir)
+    server = http.server.ThreadingHTTPServer((HOST, PORT), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def run_gui(state, ip):
+    """접속 주소와 현재 폴더를 보여주는 창.
+
+    state = {"server": ThreadingHTTPServer, "serve_dir": str}
+    창을 X(닫기)로 닫으면 서버를 멈춘다.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
 
     url_text = f"http://{ip}:{PORT}/"
 
     root = tk.Tk()
-    root.title("USB 영상 스트리밍")
+    root.title(_s("홈 스트리밍", "Home Streaming"))
     root.configure(bg="#0e0e12")
     root.resizable(False, False)
     try:
-        root.iconbitmap(os.path.join(_BASE_DIR, "tv.ico"))   # 창/작업표시줄 아이콘
+        root.iconbitmap(os.path.join(_BASE_DIR, "tv.ico"))
     except Exception:
         pass
 
-    tk.Label(root, text="폰에서 아래 주소로 접속하세요", bg="#0e0e12", fg="#9a9aae",
+    def stop():
+        state["server"].shutdown()
+        root.destroy()
+
+    def change_folder():
+        new_dir = filedialog.askdirectory(
+            title=_s("스트리밍할 영상 폴더를 선택하세요", "Select video folder to stream"),
+            initialdir=state["serve_dir"],
+            parent=root,
+        )
+        if not new_dir or new_dir == state["serve_dir"]:
+            return
+        # 기존 서버 종료 후 새 폴더로 재시작
+        state["server"].shutdown()
+        state["server"].server_close()
+        save_user_config(new_dir, AUTH_USER, AUTH_PASS)
+        state["serve_dir"] = new_dir
+        state["server"] = _start_server(new_dir)
+        dir_label.configure(text=_short_path(new_dir))
+
+    tk.Label(root, text=_s("폰에서 아래 주소로 접속하세요", "Open this address on your phone"), bg="#0e0e12", fg="#9a9aae",
              font=("Segoe UI", 10)).pack(padx=30, pady=(22, 8))
 
-    # 주소: 읽기전용 입력칸이라 마우스로 선택·복사 가능.
-    # 너비를 주소 길이에 맞춰 잘리지 않고 한 번에 다 보이게 한다.
     url = tk.Entry(root, justify="center", relief="flat", state="normal",
                    readonlybackground="#191922", fg="#8a8aff", disabledforeground="#8a8aff",
                    font=("Consolas", 15, "bold"), width=len(url_text) + 2)
@@ -304,37 +541,68 @@ def run_gui(server, ip):
     def copy_url():
         root.clipboard_clear()
         root.clipboard_append(url_text)
-        copy_btn.configure(text="복사됨!", bg="#3aa76d")
-        root.after(1500, lambda: copy_btn.configure(text="주소 복사", bg="#8a8aff"))
+        copy_btn.configure(text=_s("복사됨!", "Copied!"), bg="#3aa76d")
+        root.after(1500, lambda: copy_btn.configure(text=_s("주소 복사", "Copy URL"), bg="#8a8aff"))
 
-    copy_btn = tk.Button(root, text="주소 복사", command=copy_url,
+    copy_btn = tk.Button(root, text=_s("주소 복사", "Copy URL"), command=copy_url,
                          bg="#8a8aff", fg="#0e0e12", activebackground="#a3a3ff",
                          activeforeground="#0e0e12", relief="flat", cursor="hand2",
                          font=("Segoe UI", 10, "bold"))
     copy_btn.pack(padx=30, pady=(10, 4), ipadx=12, ipady=6, fill="x")
 
-    tk.Label(root, text="이 창을 X(닫기)로 닫으면 서버가 꺼집니다", bg="#0e0e12",
+    tk.Label(root, text=_s("서비스 중인 폴더", "Serving folder"), bg="#0e0e12", fg="#55556a",
+             font=("Segoe UI", 8)).pack(pady=(14, 2))
+
+    dir_label = tk.Label(root, text=_short_path(state["serve_dir"]),
+                         bg="#0e0e12", fg="#9a9aae", font=("Segoe UI", 9),
+                         wraplength=280)
+    dir_label.pack(padx=30, pady=(0, 6))
+
+    change_btn = tk.Button(root, text=_s("폴더 변경", "Change Folder"), command=change_folder,
+                           bg="#2a2540", fg="#8a8aff", activebackground="#3a3560",
+                           activeforeground="#a3a3ff", relief="flat", cursor="hand2",
+                           font=("Segoe UI", 9, "bold"))
+    change_btn.pack(padx=30, pady=(0, 4), ipadx=12, ipady=5, fill="x")
+
+    tk.Button(root, text=_s("계정 설정", "Account Settings"), command=lambda: _account_settings_dialog(root),
+              bg="#2a2540", fg="#8a8aff", activebackground="#3a3560",
+              activeforeground="#a3a3ff", relief="flat", cursor="hand2",
+              font=("Segoe UI", 9, "bold")
+              ).pack(padx=30, pady=(0, 4), ipadx=12, ipady=5, fill="x")
+
+    tk.Label(root, text=_s("이 창을 X(닫기)로 닫으면 서버가 꺼집니다",
+                           "Closing this window will stop the server"), bg="#0e0e12",
              fg="#55556a", font=("Segoe UI", 8)).pack(pady=(8, 22))
 
-    root.protocol("WM_DELETE_WINDOW", stop)   # 창 X(닫기)로 서버 종료
+    root.protocol("WM_DELETE_WINDOW", stop)
     root.mainloop()
 
 
 def main():
-    if not os.path.isdir(SERVE_DIR):
-        import tkinter as tk
-        from tkinter import messagebox
-        r = tk.Tk()
-        r.withdraw()
-        messagebox.showerror("오류", f"영상 폴더를 찾을 수 없습니다:\n{SERVE_DIR}")
-        r.destroy()
-        return
-    handler = partial(StreamHandler, directory=SERVE_DIR)
-    server = http.server.ThreadingHTTPServer((HOST, PORT), handler)
+    global AUTH_USER, AUTH_PASS
+
+    _init_user_config()
+    config = load_user_config()
+    # homestream.cfg 계정 설정이 .env 보다 우선
+    if "AUTH_USER" in config:
+        AUTH_USER = config["AUTH_USER"]
+    if "AUTH_PASS" in config:
+        AUTH_PASS = config["AUTH_PASS"]
+
+    # SERVE_DIR 우선순위: 환경변수 > homestream.cfg > 입력 다이얼로그
+    serve_dir = os.environ.get("SERVE_DIR") or config.get("SERVE_DIR")
+
+    if not serve_dir or not os.path.isdir(serve_dir):
+        stale = serve_dir if serve_dir and not os.path.isdir(serve_dir) else None
+        serve_dir = _ask_serve_dir(stale_path=stale)
+        if not serve_dir:
+            return  # 취소 시 종료
+        save_user_config(serve_dir, AUTH_USER, AUTH_PASS)
+
+    state = {"serve_dir": serve_dir, "server": _start_server(serve_dir)}
     ip = get_lan_ip()
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    run_gui(server, ip)
-    server.server_close()
+    run_gui(state, ip)
+    state["server"].server_close()
 
 
 if __name__ == "__main__":
