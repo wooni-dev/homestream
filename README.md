@@ -88,15 +88,11 @@ python tasks.py run
 
 ```ini
 SERVE_DIR=D:\Videos
-AUTH_USER=admin
-AUTH_PASS=
 ```
 
 | 키 | 설명 |
 |------|------|
 | `SERVE_DIR` | 스트리밍할 영상 폴더 경로 |
-| `AUTH_USER` | 접속 아이디 (기본 `admin`) |
-| `AUTH_PASS` | 접속 비밀번호. 비우면 인증 비활성화 |
 
 > 설정 우선순위: **환경변수 > `homestream.cfg`**
 
