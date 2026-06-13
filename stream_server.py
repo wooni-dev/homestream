@@ -13,7 +13,9 @@ import http.server
 import io
 import locale
 import os
+import secrets
 import socket
+import time
 import sys
 import threading
 from functools import partial
@@ -45,6 +47,11 @@ VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
 # 접속 비밀번호. AUTH_PASS 가 비어 있으면 인증 없이 동작(같은 Wi-Fi 전용).
 AUTH_USER = os.environ.get("AUTH_USER", "admin")
 AUTH_PASS = os.environ.get("AUTH_PASS", "")
+
+_TOKEN = secrets.token_hex(16)
+_SESSIONS: dict = {}  # {sid: expire_at (time.monotonic())}
+_COOKIE_NAME = "hs_sid"
+_COOKIE_MAX_AGE = 86400 * 7
 
 
 def _init_user_config():
@@ -93,6 +100,14 @@ def human_size(n):
     if n >= 1024 ** 3:
         return f"{n / 1024 ** 3:.1f} GB"
     return f"{n / 1024 ** 2:.0f} MB"
+
+
+def _make_qr_matrix(data):
+    import qrcode as _qrcode
+    qr = _qrcode.QRCode(border=1)
+    qr.add_data(data)
+    qr.make(fit=True)
+    return qr.get_matrix()
 
 
 PAGE_CSS = """
@@ -183,20 +198,46 @@ class StreamHandler(http.server.SimpleHTTPRequestHandler):
     """Range 지원 + 커스텀 UI 핸들러."""
 
     def _check_auth(self):
-        """AUTH_PASS 가 설정돼 있으면 Basic 인증을 요구한다. 통과 시 True."""
-        if not AUTH_PASS:
-            return True
-        expected = "Basic " + base64.b64encode(
-            f"{AUTH_USER}:{AUTH_PASS}".encode("utf-8")
-        ).decode("ascii")
-        given = self.headers.get("Authorization", "")
-        if hmac.compare_digest(given, expected):
-            return True
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="video", charset="UTF-8"')
-        self.send_header("Content-Length", "0")
-        self.end_headers()
-        return False
+        now = time.monotonic()
+
+        # 1. 세션 쿠키
+        for part in self.headers.get("Cookie", "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == _COOKIE_NAME:
+                if _SESSIONS.get(v, 0) > now:
+                    return True
+                _SESSIONS.pop(v, None)  # 만료된 세션 제거
+
+        # 2. QR 토큰 → 세션 발급 후 리다이렉트
+        qs = parse_qs(urlsplit(self.path).query)
+        if qs.get("auth", [""])[0] == _TOKEN:
+            sid = secrets.token_hex(16)
+            _SESSIONS[sid] = now + _COOKIE_MAX_AGE
+            dest = urlsplit(self.path).path or "/"
+            self.send_response(302)
+            self.send_header("Location", dest)
+            self.send_header(
+                "Set-Cookie",
+                f"{_COOKIE_NAME}={sid}; Path=/; Max-Age={_COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax",
+            )
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return False
+
+        # 3. Basic 인증 (AUTH_PASS 설정 시)
+        if AUTH_PASS:
+            expected = "Basic " + base64.b64encode(
+                f"{AUTH_USER}:{AUTH_PASS}".encode("utf-8")
+            ).decode("ascii")
+            if hmac.compare_digest(self.headers.get("Authorization", ""), expected):
+                return True
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="video", charset="UTF-8"')
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return False
+
+        return True
 
     def do_GET(self):
         if not self._check_auth():
@@ -519,8 +560,22 @@ def run_gui(state, ip, port):
         state["server"], _ = _start_server(new_dir)
         dir_label.configure(text=_short_path(new_dir))
 
-    tk.Label(root, text=_s("폰에서 아래 주소로 접속하세요", "Open this address on your phone"), bg="#0e0e12", fg="#9a9aae",
-             font=("Segoe UI", 10)).pack(padx=30, pady=(22, 8))
+    tk.Label(root, text=_s("QR 스캔 또는 주소로 접속", "Scan QR or enter address"),
+             bg="#0e0e12", fg="#9a9aae", font=("Segoe UI", 10)).pack(padx=30, pady=(22, 6))
+
+    qr_matrix = _make_qr_matrix(f"http://{ip}:{port}/?auth={_TOKEN}")
+    _n = len(qr_matrix)
+    _cell = max(1, 180 // _n)
+    _QR_SIZE = _cell * _n
+    qr_canvas = tk.Canvas(root, width=_QR_SIZE, height=_QR_SIZE, bg="#0e0e12",
+                          highlightthickness=0)
+    qr_canvas.pack(padx=30, pady=(0, 10))
+    for _ri, _row in enumerate(qr_matrix):
+        for _ci, _val in enumerate(_row):
+            if _val:
+                _x0, _y0 = _ci * _cell, _ri * _cell
+                qr_canvas.create_rectangle(_x0, _y0, _x0 + _cell, _y0 + _cell,
+                                           fill="#ececf1", outline="")
 
     url = tk.Entry(root, justify="center", relief="flat", state="normal",
                    readonlybackground="#191922", fg="#8a8aff", disabledforeground="#8a8aff",
