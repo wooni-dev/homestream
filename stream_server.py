@@ -6,8 +6,6 @@
 - 표준 라이브러리만 사용 (읽기 전용 — 파일 수정/삭제 없음)
 """
 
-import base64
-import hmac
 import html
 import http.server
 import io
@@ -22,7 +20,7 @@ from functools import partial
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 
 try:
-    _lang = (locale.getdefaultlocale()[0] or "").lower()
+    _lang = (locale.getlocale()[0] or "").lower()
 except Exception:
     _lang = ""
 _IS_KO = _lang.startswith("ko")
@@ -43,10 +41,6 @@ _USER_CONFIG_FILE = os.path.join(_USER_CONFIG_DIR, "homestream.cfg")
 HOST = "0.0.0.0"
 PORT = 8000
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
-
-# 접속 비밀번호. AUTH_PASS 가 비어 있으면 인증 없이 동작(같은 Wi-Fi 전용).
-AUTH_USER = os.environ.get("AUTH_USER", "admin")
-AUTH_PASS = os.environ.get("AUTH_PASS", "")
 
 _TOKEN = secrets.token_hex(16)
 _SESSIONS: dict = {}  # {sid: expire_at (time.monotonic())}
@@ -79,12 +73,10 @@ def load_user_config():
     return config
 
 
-def save_user_config(serve_dir, auth_user="", auth_pass=""):
+def save_user_config(serve_dir):
     """설정을 homestream.cfg에 저장."""
     with open(_USER_CONFIG_FILE, "w", encoding="utf-8") as f:
         f.write(f"SERVE_DIR={serve_dir}\n")
-        f.write(f"AUTH_USER={auth_user}\n")
-        f.write(f"AUTH_PASS={auth_pass}\n")
 
 
 def _short_path(path, max_len=42):
@@ -224,19 +216,6 @@ class StreamHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             return False
 
-        # 3. Basic 인증 (AUTH_PASS 설정 시)
-        if AUTH_PASS:
-            expected = "Basic " + base64.b64encode(
-                f"{AUTH_USER}:{AUTH_PASS}".encode("utf-8")
-            ).decode("ascii")
-            if hmac.compare_digest(self.headers.get("Authorization", ""), expected):
-                return True
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="video", charset="UTF-8"')
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return False
-
         return True
 
     def do_GET(self):
@@ -319,7 +298,10 @@ class StreamHandler(http.server.SimpleHTTPRequestHandler):
     def copyfile(self, source, outputfile):
         remaining = self._range_remaining
         if remaining is None:
-            super().copyfile(source, outputfile)
+            try:
+                super().copyfile(source, outputfile)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
             return
         bufsize = 64 * 1024
         while remaining > 0:
@@ -438,67 +420,6 @@ def _ask_serve_dir(stale_path=None):
     return result[0]
 
 
-def _account_settings_dialog(parent):
-    """계정 설정 다이얼로그. 저장 시 AUTH_USER/AUTH_PASS 전역 갱신."""
-    import tkinter as tk
-    global AUTH_USER, AUTH_PASS
-
-    dlg = tk.Toplevel(parent)
-    dlg.title(_s("계정 설정", "Account Settings"))
-    dlg.configure(bg="#0e0e12")
-    dlg.resizable(False, False)
-    dlg.grab_set()
-
-    tk.Label(dlg, text=_s("접속 계정 설정", "Account Settings"), bg="#0e0e12", fg="#ececf1",
-             font=("Segoe UI", 11, "bold")).pack(padx=24, pady=(20, 2))
-    tk.Label(dlg, text=_s("비밀번호를 비워두면 인증 없이 접속 가능합니다",
-                           "Leave password empty to allow access without authentication"),
-             bg="#0e0e12", fg="#55556a", font=("Segoe UI", 8)).pack(padx=24, pady=(0, 14))
-
-    def labeled_entry(label, default="", show=""):
-        tk.Label(dlg, text=label, bg="#0e0e12", fg="#9a9aae",
-                 font=("Segoe UI", 9), anchor="w").pack(padx=24, fill="x")
-        e = tk.Entry(dlg, bg="#191922", fg="#ececf1", insertbackground="#8a8aff",
-                     relief="flat", font=("Segoe UI", 10), show=show)
-        e.insert(0, default)
-        e.pack(padx=24, pady=(3, 10), ipady=6, fill="x")
-        return e
-
-    user_entry = labeled_entry(_s("아이디", "Username"), AUTH_USER)
-    pass_entry = labeled_entry(_s("비밀번호", "Password"), AUTH_PASS, show="●")
-
-    show_var = tk.BooleanVar(value=False)
-    def toggle_show():
-        pass_entry.configure(show="" if show_var.get() else "●")
-    tk.Checkbutton(dlg, text=_s("비밀번호 표시", "Show password"), variable=show_var, command=toggle_show,
-                   bg="#0e0e12", fg="#9a9aae", activebackground="#0e0e12",
-                   activeforeground="#ececf1", selectcolor="#191922",
-                   font=("Segoe UI", 9), cursor="hand2"
-                   ).pack(padx=24, anchor="w", pady=(0, 8))
-
-    def save():
-        global AUTH_USER, AUTH_PASS
-        AUTH_USER = user_entry.get().strip()
-        AUTH_PASS = pass_entry.get()
-        config = load_user_config()
-        save_user_config(config.get("SERVE_DIR", ""), AUTH_USER, AUTH_PASS)
-        dlg.destroy()
-
-    btns = tk.Frame(dlg, bg="#0e0e12")
-    btns.pack(padx=24, pady=(4, 20), fill="x")
-
-    tk.Button(btns, text=_s("취소", "Cancel"), command=dlg.destroy,
-              bg="#23232c", fg="#9a9aae", activebackground="#2a2a36",
-              relief="flat", cursor="hand2", font=("Segoe UI", 9)
-              ).pack(side="right", padx=(6, 0), ipadx=14, ipady=6)
-    tk.Button(btns, text=_s("저장", "Save"), command=save,
-              bg="#8a8aff", fg="#0e0e12", activebackground="#a3a3ff",
-              activeforeground="#0e0e12", relief="flat", cursor="hand2",
-              font=("Segoe UI", 10, "bold")
-              ).pack(side="right", ipadx=18, ipady=6)
-
-    dlg.bind("<Return>", lambda e: save())
-
 
 def _start_server(serve_dir):
     """serve_dir 로 ThreadingHTTPServer 를 만들고 백그라운드에서 시작한다.
@@ -555,7 +476,7 @@ def run_gui(state, ip, port):
         # 기존 서버 종료 후 새 폴더로 재시작
         state["server"].shutdown()
         state["server"].server_close()
-        save_user_config(new_dir, AUTH_USER, AUTH_PASS)
+        save_user_config(new_dir)
         state["serve_dir"] = new_dir
         state["server"], _ = _start_server(new_dir)
         dir_label.configure(text=_short_path(new_dir))
@@ -603,12 +524,6 @@ def run_gui(state, ip, port):
                            font=("Segoe UI", 9, "bold"))
     change_btn.pack(padx=30, pady=(0, 4), ipadx=12, ipady=5, fill="x")
 
-    tk.Button(root, text=_s("계정 설정", "Account Settings"), command=lambda: _account_settings_dialog(root),
-              bg="#2a2540", fg="#8a8aff", activebackground="#3a3560",
-              activeforeground="#a3a3ff", relief="flat", cursor="hand2",
-              font=("Segoe UI", 9, "bold")
-              ).pack(padx=30, pady=(0, 4), ipadx=12, ipady=5, fill="x")
-
     tk.Label(root, text=_s("이 창을 X(닫기)로 닫으면 서버가 꺼집니다",
                            "Closing this window will stop the server"), bg="#0e0e12",
              fg="#55556a", font=("Segoe UI", 8)).pack(pady=(8, 22))
@@ -618,15 +533,8 @@ def run_gui(state, ip, port):
 
 
 def main():
-    global AUTH_USER, AUTH_PASS
-
     _init_user_config()
     config = load_user_config()
-    # homestream.cfg 계정 설정이 .env 보다 우선
-    if "AUTH_USER" in config:
-        AUTH_USER = config["AUTH_USER"]
-    if "AUTH_PASS" in config:
-        AUTH_PASS = config["AUTH_PASS"]
 
     # SERVE_DIR 우선순위: 환경변수 > homestream.cfg > 입력 다이얼로그
     serve_dir = os.environ.get("SERVE_DIR") or config.get("SERVE_DIR")
@@ -636,7 +544,7 @@ def main():
         serve_dir = _ask_serve_dir(stale_path=stale)
         if not serve_dir:
             return  # 취소 시 종료
-        save_user_config(serve_dir, AUTH_USER, AUTH_PASS)
+        save_user_config(serve_dir)
 
     server, port = _start_server(serve_dir)
     state = {"serve_dir": serve_dir, "server": server}
