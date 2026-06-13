@@ -577,13 +577,6 @@ def run_gui(state, ip, port):
                 qr_canvas.create_rectangle(_x0, _y0, _x0 + _cell, _y0 + _cell,
                                            fill="#ececf1", outline="")
 
-    url = tk.Entry(root, justify="center", relief="flat", state="normal",
-                   readonlybackground="#191922", fg="#8a8aff", disabledforeground="#8a8aff",
-                   font=("Consolas", 15, "bold"), width=len(url_text) + 2)
-    url.insert(0, url_text)
-    url.configure(state="readonly")
-    url.pack(padx=30, pady=4, ipady=8)
-
     def copy_url():
         root.clipboard_clear()
         root.clipboard_append(url_text)
