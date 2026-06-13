@@ -30,12 +30,8 @@ def _s(ko, en):
 
 if getattr(sys, "frozen", False):
     _BASE_DIR = sys._MEIPASS
-    _USER_CONFIG_DIR = os.path.dirname(sys.executable)
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    _USER_CONFIG_DIR = _BASE_DIR
-
-_USER_CONFIG_FILE = os.path.join(_USER_CONFIG_DIR, "homestream.cfg")
 
 # ===== 설정 =====
 HOST = "0.0.0.0"
@@ -46,37 +42,6 @@ _TOKEN = secrets.token_hex(16)
 _SESSIONS: dict = {}  # {sid: expire_at (time.monotonic())}
 _COOKIE_NAME = "hs_sid"
 _COOKIE_MAX_AGE = 86400 * 7
-
-
-def _init_user_config():
-    """homestream.cfg 없으면 example에서 자동 복사."""
-    if not os.path.exists(_USER_CONFIG_FILE):
-        example = os.path.join(_BASE_DIR, "homestream.cfg.example")
-        if os.path.exists(example):
-            import shutil
-            shutil.copy2(example, _USER_CONFIG_FILE)
-
-
-def load_user_config():
-    """homestream.cfg에서 설정 읽기. dict 반환."""
-    config = {}
-    try:
-        with open(_USER_CONFIG_FILE, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, val = line.partition("=")
-                config[key.strip()] = val.strip()
-    except FileNotFoundError:
-        pass
-    return config
-
-
-def save_user_config(serve_dir):
-    """설정을 homestream.cfg에 저장."""
-    with open(_USER_CONFIG_FILE, "w", encoding="utf-8") as f:
-        f.write(f"SERVE_DIR={serve_dir}\n")
 
 
 def _short_path(path, max_len=42):
@@ -216,7 +181,14 @@ class StreamHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             return False
 
-        return True
+        # 3. 미인증 → 403
+        body = _s("QR 코드를 스캔해 주세요.", "Please scan the QR code.").encode()
+        self.send_response(403)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return False
 
     def do_GET(self):
         if not self._check_auth():
@@ -329,10 +301,9 @@ def get_lan_ip():
         s.close()
 
 
-def _ask_serve_dir(stale_path=None):
+def _ask_serve_dir():
     """경로 직접 입력 or 찾아보기 다이얼로그.
 
-    stale_path: 이전에 저장됐지만 지금 없는 경로 (있으면 입력칸에 미리 채워줌).
     확인 시 경로 유효성 검사 → 없으면 에러 메시지 유지, 있으면 경로 반환.
     취소하면 None 반환.
     """
@@ -350,16 +321,10 @@ def _ask_serve_dir(stale_path=None):
     except Exception:
         pass
 
-    if stale_path:
-        tk.Label(dlg, text=_s(f"저장된 폴더를 찾을 수 없습니다:\n{stale_path}",
-                              f"Saved folder not found:\n{stale_path}"),
-                 bg="#0e0e12", fg="#ff6b6b", font=("Segoe UI", 9),
-                 wraplength=320, justify="left").pack(padx=24, pady=(20, 4))
-
     tk.Label(dlg, text=_s("스트리밍할 영상 폴더 경로를 입력하거나 선택하세요",
                            "Enter or browse to the video folder"),
              bg="#0e0e12", fg="#9a9aae", font=("Segoe UI", 9)
-             ).pack(padx=24, pady=(16 if not stale_path else 6, 6))
+             ).pack(padx=24, pady=(16, 6))
 
     row = tk.Frame(dlg, bg="#0e0e12")
     row.pack(padx=24, pady=4, fill="x")
@@ -367,8 +332,6 @@ def _ask_serve_dir(stale_path=None):
     entry = tk.Entry(row, bg="#191922", fg="#ececf1", insertbackground="#8a8aff",
                      relief="flat", font=("Segoe UI", 10), width=38)
     entry.pack(side="left", ipady=7, fill="x", expand=True)
-    if stale_path:
-        entry.insert(0, stale_path)
 
     def browse():
         initial = entry.get().strip() or os.path.expanduser("~")
@@ -476,7 +439,6 @@ def run_gui(state, ip, port):
         # 기존 서버 종료 후 새 폴더로 재시작
         state["server"].shutdown()
         state["server"].server_close()
-        save_user_config(new_dir)
         state["serve_dir"] = new_dir
         state["server"], _ = _start_server(new_dir)
         dir_label.configure(text=_short_path(new_dir))
@@ -533,18 +495,13 @@ def run_gui(state, ip, port):
 
 
 def main():
-    _init_user_config()
-    config = load_user_config()
-
-    # SERVE_DIR 우선순위: 환경변수 > homestream.cfg > 입력 다이얼로그
-    serve_dir = os.environ.get("SERVE_DIR") or config.get("SERVE_DIR")
+    # SERVE_DIR 우선순위: 환경변수 > 입력 다이얼로그
+    serve_dir = os.environ.get("SERVE_DIR")
 
     if not serve_dir or not os.path.isdir(serve_dir):
-        stale = serve_dir if serve_dir and not os.path.isdir(serve_dir) else None
-        serve_dir = _ask_serve_dir(stale_path=stale)
+        serve_dir = _ask_serve_dir()
         if not serve_dir:
             return  # 취소 시 종료
-        save_user_config(serve_dir)
 
     server, port = _start_server(serve_dir)
     state = {"serve_dir": serve_dir, "server": server}

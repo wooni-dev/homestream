@@ -1,6 +1,5 @@
-# 실제 설정/비밀번호 — 절대 커밋 금지 (.env.example 만 공유)
+# 실제 설정/비밀번호 — 절대 커밋 금지
 .env
-homestream.cfg
 
 # 가상환경
 .venv/

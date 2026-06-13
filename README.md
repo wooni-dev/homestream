@@ -1,7 +1,7 @@
 # 📺 HomeStream
 
 같은 Wi-Fi에 연결된 **휴대폰에서 PC/USB 안의 영상을 브라우저로 재생**하는 로컬 스트리밍 서버입니다.
-파이썬 **표준 라이브러리만** 사용하며, 영상을 외부로 업로드하지 않고 내 네트워크 안에서만 전송합니다.
+영상을 외부로 업로드하지 않고 내 네트워크 안에서만 전송합니다.
 
 [![GitHub release](https://img.shields.io/github/v/release/wooni-dev/homestream)](https://github.com/wooni-dev/homestream/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
@@ -26,13 +26,13 @@
 
 - **모바일 전용 UI** — 폴더 탐색 + 다크 테마 영상 플레이어
 - **탐색(seek)·일시정지 지원** — HTTP Range 요청 처리로 모바일에서 정상 동작
-- **GUI 설정** — 영상 폴더·계정을 앱 안에서 직접 변경 (`homestream.cfg`에 저장)
-- **비밀번호 보호** — 선택적 Basic 인증, 비워두면 인증 없이 접속
+- **GUI 설정** — 영상 폴더를 앱 안에서 직접 변경
+- **QR 토큰 인증** — QR 스캔으로 접속, 자격증명이 네트워크를 타지 않음
 - **다국어 GUI** — OS 언어가 한국어면 한국어, 그 외에는 영어로 표시
 - **크로스플랫폼** — Windows / macOS / Linux 빌드 지원
 - **단일 실행파일** — Python 없이 더블클릭 실행 (PyInstaller)
 - **읽기 전용** — 파일을 수정·삭제·이동하지 않음
-- **의존성 0** — 런타임은 파이썬 표준 라이브러리만 사용
+- **최소 의존성** — 런타임 의존성: `qrcode` 단 1개
 
 ---
 
@@ -71,30 +71,18 @@ python -m venv .venv
 python tasks.py run
 ```
 
-처음 실행하면 **영상 폴더 선택 다이얼로그**가 뜨고, 이후 접속 주소가 적힌 창이 표시됩니다.
-폴더·계정은 앱 안에서 언제든 변경할 수 있습니다.
+처음 실행하면 **영상 폴더 선택 다이얼로그**가 뜨고, 이후 접속 QR 코드가 적힌 창이 표시됩니다.
+폴더는 앱의 **폴더 변경** 버튼으로 바꿀 수 있습니다.
 
 ---
 
 ## ⚙️ 설정
 
-### GUI에서 변경 (권장)
+영상 폴더는 앱 실행 시 다이얼로그에서 선택합니다. 환경변수로도 지정할 수 있습니다.
 
-앱 실행 후 **폴더 변경** / **계정 설정** 버튼으로 변경하면 `homestream.cfg`에 자동 저장됩니다.
-
-### 파일로 직접 변경
-
-`homestream.cfg.example`을 `homestream.cfg`로 복사 후 수정:
-
-```ini
-SERVE_DIR=D:\Videos
-```
-
-| 키 | 설명 |
+| 환경변수 | 설명 |
 |------|------|
-| `SERVE_DIR` | 스트리밍할 영상 폴더 경로 |
-
-> 설정 우선순위: **환경변수 > `homestream.cfg`**
+| `SERVE_DIR` | 스트리밍할 영상 폴더 경로 (설정 시 다이얼로그 생략) |
 
 ---
 
@@ -112,7 +100,6 @@ python tasks.py build
 
 각 OS에서 실행한 결과물은 해당 OS에서만 동작합니다.
 
-> ⚠️ `homestream.cfg`는 **절대 빌드 산출물에 포함하지 마세요.** 사용자 경로·비밀번호가 들어있습니다.
 > 빌드 후 `dist/` 폴더에는 exe 파일만 있어야 합니다.
 
 ---
@@ -148,8 +135,6 @@ git push origin v1.x.x
 gh release create v1.x.x dist\stream_server.exe --title "HomeStream v1.x.x" --notes "변경 내용"
 ```
 
-> ⚠️ `dist\homestream.cfg`가 생성되어 있으면 업로드하지 마세요. exe 파일만 업로드합니다.
-
 ---
 
 ## 🌐 웹사이트 (`homestream-web`)
@@ -179,9 +164,8 @@ Vercel 설정: homestream-web 프로젝트 → Settings → Environment Variable
 
 - 기본은 **같은 Wi-Fi 안에서만** 접속 가능하며, 인터넷 외부에는 노출되지 않습니다(공유기 NAT + 방화벽).
 - 기본 포트: **8000** (방화벽에서 허용 필요 — Windows는 첫 실행 시 팝업에서 허용)
-- 비밀번호(Basic 인증)는 **HTTPS가 아니라** 평문(base64)으로 전송됩니다.
-  → 외부에서 쓰려면 **Tailscale / WireGuard / SSH 터널** 같은 암호화 통로 안에서 사용하세요.
-- 카페·회사 등 **모르는 사람과 같은 공용 Wi-Fi**에서는 비밀번호를 꼭 설정하세요.
+- **QR 토큰 인증** — QR 코드 스캔 없이는 접속 불가. 자격증명이 네트워크를 타지 않아 HTTP 평문 전송 문제 없음.
+- 외부에서 접속이 필요하면 **Tailscale / WireGuard / SSH 터널** 같은 암호화 통로 안에서 사용하세요.
 
 ---
 
@@ -192,8 +176,6 @@ Vercel 설정: homestream-web 프로젝트 → Settings → Environment Variable
 | `stream_server.py` | 스트리밍 서버 + GUI (메인) |
 | `stream_server.spec` | PyInstaller 빌드 설정 |
 | `tasks.py` | 빌드·실행 태스크 러너 (`python tasks.py build/run`) |
-| `homestream.cfg.example` | 설정 파일 템플릿 (빌드에 포함됨) |
-| `homestream.cfg` | 사용자 런타임 설정 (gitignore, 배포 제외) |
 
 ---
 
@@ -206,4 +188,3 @@ Vercel 설정: homestream-web 프로젝트 → Settings → Environment Variable
 | 처음 실행 시 접속 불가 | Windows 방화벽 팝업에서 "개인 네트워크 허용" 클릭 |
 | 재빌드 시 `PermissionError` | 이전 exe가 실행 중 → 창을 닫고 다시 빌드 |
 | 포트 8000이 이미 사용 중 | 다른 앱이 8000번 포트 사용 중 → 해당 앱 종료 후 재실행 |
-| 실행 시 이전 폴더 경로가 기본값으로 뜸 | exe 옆의 `homestream.cfg` 삭제 후 재실행 |

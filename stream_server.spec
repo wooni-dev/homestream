@@ -11,7 +11,7 @@ else:
     _icon = None  # Linux: EXE에 아이콘 임베딩 미지원
 
 # 플랫폼에 존재하는 아이콘만 번들에 포함
-_datas = [('homestream.cfg.example', '.')]
+_datas = []
 if sys.platform == 'win32' and os.path.exists('tv.ico'):
     _datas.append(('tv.ico', '.'))
 elif sys.platform == 'darwin' and os.path.exists('tv.icns'):
