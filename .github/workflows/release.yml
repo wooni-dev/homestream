@@ -24,11 +24,14 @@ jobs:
       - name: Build exe
         run: python -m PyInstaller stream_server.spec
 
+      - name: Rename exe
+        run: mv dist/stream_server.exe dist/HomeStream.exe
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: stream_server-windows
-          path: dist/stream_server.exe
+          name: build-windows
+          path: dist/HomeStream.exe
 
   build-macos:
     runs-on: macos-13
@@ -46,13 +49,13 @@ jobs:
         run: python -m PyInstaller stream_server.spec
 
       - name: Zip app bundle
-        run: cd dist && zip -r HomeStream-macOS.zip HomeStream.app
+        run: cd dist && zip -r HomeStream.zip HomeStream.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: stream_server-macos
-          path: dist/HomeStream-macOS.zip
+          name: build-macos
+          path: dist/HomeStream.zip
 
   release:
     needs: [build-windows, build-macos]
@@ -66,30 +69,30 @@ jobs:
       - name: Download Windows build
         uses: actions/download-artifact@v4
         with:
-          name: stream_server-windows
+          name: build-windows
           path: artifacts/windows
 
       - name: Download macOS build
         uses: actions/download-artifact@v4
         with:
-          name: stream_server-macos
+          name: build-macos
           path: artifacts/macos
 
       - name: Upload versioned release to R2
         run: |
           TAG=${{ github.ref_name }}
-          aws s3 cp artifacts/windows/stream_server.exe \
-            s3://$R2_BUCKET/releases/$TAG/stream_server.exe \
+          aws s3 cp artifacts/windows/HomeStream.exe \
+            s3://$R2_BUCKET/releases/$TAG/windows/HomeStream.exe \
             --endpoint-url $R2_ENDPOINT
-          aws s3 cp artifacts/macos/HomeStream-macOS.zip \
-            s3://$R2_BUCKET/releases/$TAG/HomeStream-macOS.zip \
+          aws s3 cp artifacts/macos/HomeStream.zip \
+            s3://$R2_BUCKET/releases/$TAG/macos/HomeStream.zip \
             --endpoint-url $R2_ENDPOINT
 
       - name: Update latest to R2
         run: |
-          aws s3 cp artifacts/windows/stream_server.exe \
-            s3://$R2_BUCKET/releases/latest/stream_server.exe \
+          aws s3 cp artifacts/windows/HomeStream.exe \
+            s3://$R2_BUCKET/releases/latest/windows/HomeStream.exe \
             --endpoint-url $R2_ENDPOINT
-          aws s3 cp artifacts/macos/HomeStream-macOS.zip \
-            s3://$R2_BUCKET/releases/latest/HomeStream-macOS.zip \
+          aws s3 cp artifacts/macos/HomeStream.zip \
+            s3://$R2_BUCKET/releases/latest/macos/HomeStream.zip \
             --endpoint-url $R2_ENDPOINT
