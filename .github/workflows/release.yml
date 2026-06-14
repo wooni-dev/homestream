@@ -57,6 +57,11 @@ jobs:
   release:
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
     steps:
       - name: Download Windows build
         uses: actions/download-artifact@v4
@@ -70,10 +75,21 @@ jobs:
           name: stream_server-macos
           path: artifacts/macos
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            artifacts/windows/stream_server.exe
-            artifacts/macos/HomeStream-macOS.zip
-          generate_release_notes: true
+      - name: Upload versioned release to R2
+        run: |
+          TAG=${{ github.ref_name }}
+          aws s3 cp artifacts/windows/stream_server.exe \
+            s3://$R2_BUCKET/releases/$TAG/stream_server.exe \
+            --endpoint-url $R2_ENDPOINT
+          aws s3 cp artifacts/macos/HomeStream-macOS.zip \
+            s3://$R2_BUCKET/releases/$TAG/HomeStream-macOS.zip \
+            --endpoint-url $R2_ENDPOINT
+
+      - name: Update latest to R2
+        run: |
+          aws s3 cp artifacts/windows/stream_server.exe \
+            s3://$R2_BUCKET/releases/latest/stream_server.exe \
+            --endpoint-url $R2_ENDPOINT
+          aws s3 cp artifacts/macos/HomeStream-macOS.zip \
+            s3://$R2_BUCKET/releases/latest/HomeStream-macOS.zip \
+            --endpoint-url $R2_ENDPOINT
