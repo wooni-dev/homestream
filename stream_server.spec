@@ -48,7 +48,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch='universal2' if sys.platform == 'darwin' else None,
     codesign_identity=None,
     entitlements_file=None,
     icon=_icon,

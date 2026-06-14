@@ -19,7 +19,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install pyinstaller
+        run: pip install pyinstaller -r requirements.txt
 
       - name: Build exe
         run: python -m PyInstaller stream_server.spec
@@ -31,7 +31,7 @@ jobs:
           path: dist/stream_server.exe
 
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install pyinstaller
+        run: pip install pyinstaller -r requirements.txt
 
       - name: Build app
         run: python -m PyInstaller stream_server.spec
