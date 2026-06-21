@@ -12,6 +12,13 @@ build/
 __pycache__/
 *.py[cod]
 
+# C# 빌드 산출물
+bin/
+obj/
+dist_cs/
+*.user
+.vs/
+
 # 에디터/도구 설정
 .vscode/
 .idea/
