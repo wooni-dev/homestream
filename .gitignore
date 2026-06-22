@@ -4,6 +4,7 @@
 # C# 빌드 산출물
 bin/
 obj/
+dist/
 dist_cs/
 *.user
 .vs/
