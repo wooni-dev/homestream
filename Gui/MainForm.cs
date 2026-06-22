@@ -110,7 +110,7 @@ internal sealed class MainForm : Form
                 InitialDirectory = _server.ServeDir,
                 Description = S("스트리밍할 영상 폴더를 선택하세요", "Select video folder to stream")
             };
-            if (dlg.ShowDialog() == DialogResult.OK && dlg.SelectedPath != _server.ServeDir)
+            if (dlg.ShowDialog(this) == DialogResult.OK && dlg.SelectedPath != _server.ServeDir)
             {
                 _server.Stop();
                 _server.Start(dlg.SelectedPath);

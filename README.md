@@ -70,14 +70,38 @@
 
 ---
 
-## 소스에서 빌드
+## 소스에서 개발 실행
 
+**PowerShell**
 ```powershell
-# 빌드
-dotnet publish HomeStream.csproj -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release -o dist
+# 폴더 다이얼로그 없이 바로 실행
+$env:SERVE_DIR = "C:\Videos"; dotnet run
 
-# 실행
-dotnet run
+# 또는 빌드 후 exe 직접 실행
+dotnet build
+$env:SERVE_DIR = "C:\Videos"; .\bin\Debug\net8.0-windows\HomeStream.exe
+```
+
+**Git Bash / bash**
+```bash
+SERVE_DIR="C:/Videos" dotnet run
+
+# 또는 빌드 후 exe 직접 실행
+dotnet build
+SERVE_DIR="C:/Videos" ./bin/Debug/net8.0-windows/HomeStream.exe
+```
+
+**cmd**
+```cmd
+set SERVE_DIR=C:\Videos && dotnet run
+```
+
+> `SERVE_DIR` 없이 실행하면 시작 시 폴더 선택 다이얼로그가 표시됩니다.
+
+## 배포용 빌드
+
+```bash
+dotnet publish HomeStream.csproj -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release -o dist
 ```
 
 → `dist/HomeStream.exe` 생성.

@@ -16,7 +16,9 @@ if (string.IsNullOrEmpty(serveDir) || !Directory.Exists(serveDir))
             ? "스트리밍할 영상 폴더를 선택하세요"
             : "Select video folder to stream"
     };
-    if (dlg.ShowDialog() != DialogResult.OK) return;
+    using var owner = new Form { ShowInTaskbar = false, TopMost = true };
+    _ = owner.Handle;
+    if (dlg.ShowDialog(owner) != DialogResult.OK) return;
     serveDir = dlg.SelectedPath;
 }
 
