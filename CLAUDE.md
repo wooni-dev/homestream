@@ -4,8 +4,8 @@
 
 ## 현재 상태
 
-Python(PyInstaller) → **C# (.NET)으로 재작성 중**.
-기존 Python 소스: `stream_server.py` (참조용으로 유지)
+C# (.NET 8) 재작성 완료. Python 소스는 삭제됨.
+랜딩 페이지: https://gethomestream.com/ (Cloudflare Pages)
 
 ## 기술 스팩
 

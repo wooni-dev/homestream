@@ -10,7 +10,7 @@
 
 ## 다운로드
 
-**[홈페이지에서 다운로드](https://homestream-web.vercel.app/)** (Windows 단일 실행파일)
+**[홈페이지에서 다운로드](https://gethomestream.com/)** (Windows 단일 실행파일)
 
 또는 [GitHub Releases](https://github.com/wooni-dev/homestream/releases/latest)에서 직접 받을 수 있습니다.
 
@@ -51,7 +51,7 @@
 
 ## 빠른 시작
 
-1. [홈페이지](https://homestream-web.vercel.app/)에서 `HomeStream.exe` 다운로드
+1. [홈페이지](https://gethomestream.com/)에서 `HomeStream.exe` 다운로드
 2. 더블클릭으로 실행
 3. **영상 폴더**를 선택하면 QR 코드와 접속 주소가 표시됨
 4. 폰 카메라로 QR 스캔 → 폴더·영상 목록에서 재생
@@ -97,10 +97,10 @@ git push origin v1.x.x
 
 ## 웹사이트 (`homestream-web`)
 
-릴리즈 다운로드 페이지는 별도 레포 [`wooni-dev/homestream-web`](https://github.com/wooni-dev/homestream-web)으로 관리되며 Vercel에 배포됩니다.
+릴리즈 다운로드 페이지는 별도 레포 [`wooni-dev/homestream-web`](https://github.com/wooni-dev/homestream-web)으로 관리되며 Cloudflare Pages에 배포됩니다.
 
-- **URL**: https://homestream-web.vercel.app/
-- **배포**: `homestream-web` 레포에 push하면 Vercel이 자동 배포. 또한 이 레포에 새 릴리즈가 배포되면 Vercel Deploy Hook을 통해 자동 재빌드됩니다.
+- **URL**: https://gethomestream.com/
+- **배포**: `homestream-web` 레포에 push하면 Cloudflare Pages가 자동 배포. 또한 이 레포에 새 릴리즈가 배포되면 Cloudflare Deploy Hook을 통해 자동 재빌드됩니다.
 
 ---
 
