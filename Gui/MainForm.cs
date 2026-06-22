@@ -105,16 +105,22 @@ internal sealed class MainForm : Form
         var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, AccentColor, new Padding(0, 0, 0, 4));
         changeBtn.Click += (_, _) =>
         {
-            using var dlg = new FolderBrowserDialog
+            try
             {
-                InitialDirectory = _server.ServeDir,
-                Description = S("스트리밍할 영상 폴더를 선택하세요", "Select video folder to stream")
-            };
-            if (dlg.ShowDialog(this) == DialogResult.OK && dlg.SelectedPath != _server.ServeDir)
+                using var dlg = new FolderBrowserDialog { InitialDirectory = _server.ServeDir };
+                TopMost = true;
+                var result = dlg.ShowDialog(this);
+                TopMost = false;
+                if (result == DialogResult.OK && dlg.SelectedPath != _server.ServeDir)
+                {
+                    _server.Stop();
+                    _server.Start(dlg.SelectedPath);
+                    _dirLabel.Text = ShortPath(_server.ServeDir);
+                }
+            }
+            catch (Exception ex)
             {
-                _server.Stop();
-                _server.Start(dlg.SelectedPath);
-                _dirLabel.Text = ShortPath(_server.ServeDir);
+                MessageBox.Show(ex.ToString(), "오류");
             }
         };
         layout.Controls.Add(changeBtn);

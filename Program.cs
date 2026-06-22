@@ -1,29 +1,30 @@
-using System.Globalization;
 using System.Windows.Forms;
 using HomeStream.Gui;
 using HomeStream.Server;
 
-Application.SetHighDpiMode(HighDpiMode.SystemAware);
-Application.EnableVisualStyles();
-Application.SetCompatibleTextRenderingDefault(false);
-
-string? serveDir = Environment.GetEnvironmentVariable("SERVE_DIR");
-if (string.IsNullOrEmpty(serveDir) || !Directory.Exists(serveDir))
+internal static class Program
 {
-    using var dlg = new FolderBrowserDialog
+    [STAThread]
+    static void Main()
     {
-        Description = CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ko"
-            ? "스트리밍할 영상 폴더를 선택하세요"
-            : "Select video folder to stream"
-    };
-    using var owner = new Form { ShowInTaskbar = false, TopMost = true };
-    _ = owner.Handle;
-    if (dlg.ShowDialog(owner) != DialogResult.OK) return;
-    serveDir = dlg.SelectedPath;
+        Application.SetHighDpiMode(HighDpiMode.SystemAware);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+
+        string? serveDir = Environment.GetEnvironmentVariable("SERVE_DIR");
+        if (string.IsNullOrEmpty(serveDir) || !Directory.Exists(serveDir))
+        {
+            using var owner = new Form { ShowInTaskbar = false, TopMost = true };
+            _ = owner.Handle;
+            using var dlg = new FolderBrowserDialog();
+            if (dlg.ShowDialog(owner) != DialogResult.OK) return;
+            serveDir = dlg.SelectedPath;
+        }
+
+        var server = new StreamServer();
+        server.Start(serveDir);
+        string ip = StreamServer.GetLanIp();
+
+        Application.Run(new MainForm(server, ip));
+    }
 }
-
-var server = new StreamServer();
-server.Start(serveDir);
-string ip = StreamServer.GetLanIp();
-
-Application.Run(new MainForm(server, ip));
