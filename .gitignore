@@ -1,17 +1,6 @@
 # 실제 설정/비밀번호 — 절대 커밋 금지
 .env
 
-# 가상환경
-.venv/
-
-# PyInstaller 빌드 산출물 (비번이 박힌 exe 포함)
-dist/
-build/
-
-# 파이썬 캐시
-__pycache__/
-*.py[cod]
-
 # C# 빌드 산출물
 bin/
 obj/
