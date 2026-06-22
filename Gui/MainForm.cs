@@ -11,10 +11,7 @@ internal sealed class MainForm : Form
     private static readonly Color BgColor = ColorTranslator.FromHtml("#0e0e12");
     private static readonly Color TextMuted = ColorTranslator.FromHtml("#9a9aae");
     private static readonly Color TextDim = ColorTranslator.FromHtml("#55556a");
-    private static readonly Color AccentColor = ColorTranslator.FromHtml("#8a8aff");
     private static readonly Color AccentDark = ColorTranslator.FromHtml("#2a2540");
-    private static readonly Color AccentLight = ColorTranslator.FromHtml("#a3a3ff");
-    private static readonly Color SuccessColor = ColorTranslator.FromHtml("#3aa76d");
     private static readonly Color QrModule = ColorTranslator.FromHtml("#ececf1");
 
     private static readonly bool IsKo =
@@ -23,15 +20,12 @@ internal sealed class MainForm : Form
     private static string S(string ko, string en) => IsKo ? ko : en;
 
     private readonly StreamServer _server;
-    private readonly string _ip;
     private readonly bool[,] _qrMatrix;
     private Label _dirLabel = null!;
-    private Button _copyBtn = null!;
 
     public MainForm(StreamServer server, string ip)
     {
         _server = server;
-        _ip = ip;
         string authUrl = $"http://{ip}:{server.ActualPort}/?auth={server.Auth.Token}";
         _qrMatrix = QrCode.Encode(authUrl);
         BuildUI(ip, server.ActualPort);
@@ -53,22 +47,25 @@ internal sealed class MainForm : Form
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             BackColor = BgColor,
-            Padding = new Padding(30, 22, 30, 22),
+            Padding = new Padding(36, 32, 36, 32),
         };
 
+        const int contentWidth = 400;
+
         layout.Controls.Add(MakeLabel(S("QR 스캔 또는 주소로 접속", "Scan QR or enter address"),
-            TextMuted, new Font("Segoe UI", 10f), new Padding(0, 0, 0, 6)));
+            TextMuted, new Font("Segoe UI", 10f), new Padding(0, 0, 0, 14), contentWidth));
 
         // QR canvas
         int n = _qrMatrix.GetLength(0);
-        int cell = Math.Max(1, 180 / n);
+        int cell = Math.Max(1, contentWidth / n);
         int qrSize = cell * n;
+        int qrMargin = Math.Max(0, (contentWidth - qrSize) / 2);
         var qrPanel = new Panel
         {
             Width = qrSize,
             Height = qrSize,
             BackColor = BgColor,
-            Margin = new Padding(0, 0, 0, 10),
+            Margin = new Padding(qrMargin, 0, 0, 10),
         };
         qrPanel.Paint += (_, e) =>
         {
@@ -80,29 +77,23 @@ internal sealed class MainForm : Form
         };
         layout.Controls.Add(qrPanel);
 
-        _copyBtn = MakeButton(S("주소 복사", "Copy URL"), AccentColor, BgColor, new Padding(0, 10, 0, 4));
-        _copyBtn.Click += async (_, _) =>
+        var dirFont = new Font("Segoe UI", 10f);
+        string dirText = BreakPath(_server.ServeDir, dirFont, contentWidth);
+        _dirLabel = new Label
         {
-            Clipboard.SetText($"http://{ip}:{port}/");
-            _copyBtn.Text = S("복사됨!", "Copied!");
-            _copyBtn.BackColor = SuccessColor;
-            await Task.Delay(1500);
-            if (!IsDisposed)
-            {
-                _copyBtn.Text = S("주소 복사", "Copy URL");
-                _copyBtn.BackColor = AccentColor;
-            }
+            Text = dirText,
+            ForeColor = TextMuted,
+            Font = dirFont,
+            BackColor = Color.Transparent,
+            AutoSize = false,
+            Width = contentWidth,
+            Height = CalcLabelHeight(dirText, dirFont),
+            TextAlign = ContentAlignment.TopCenter,
+            Margin = new Padding(0, 22, 0, 14),
         };
-        layout.Controls.Add(_copyBtn);
-
-        layout.Controls.Add(MakeLabel(S("서비스 중인 폴더", "Serving folder"),
-            TextDim, new Font("Segoe UI", 8f), new Padding(0, 14, 0, 2)));
-
-        _dirLabel = MakeLabel(ShortPath(_server.ServeDir), TextMuted,
-            new Font("Segoe UI", 9f), new Padding(0, 0, 0, 6));
         layout.Controls.Add(_dirLabel);
 
-        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, AccentColor, new Padding(0, 0, 0, 4));
+        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, TextMuted, new Padding(0, 0, 0, 10));
         changeBtn.Click += (_, _) =>
         {
             try
@@ -115,7 +106,9 @@ internal sealed class MainForm : Form
                 {
                     _server.Stop();
                     _server.Start(dlg.SelectedPath);
-                    _dirLabel.Text = ShortPath(_server.ServeDir);
+                    string newText = BreakPath(_server.ServeDir, _dirLabel.Font, _dirLabel.Width);
+                    _dirLabel.Text = newText;
+                    _dirLabel.Height = CalcLabelHeight(newText, _dirLabel.Font);
                 }
             }
             catch (Exception ex)
@@ -127,7 +120,7 @@ internal sealed class MainForm : Form
 
         layout.Controls.Add(MakeLabel(
             S("이 창을 X(닫기)로 닫으면 서버가 꺼집니다", "Closing this window will stop the server"),
-            TextDim, new Font("Segoe UI", 8f), new Padding(0, 8, 0, 0)));
+            TextDim, new Font("Segoe UI", 9f), new Padding(0, 4, 0, 0), contentWidth, height: 40));
 
         Controls.Add(layout);
         ClientSize = new Size(layout.PreferredSize.Width, layout.PreferredSize.Height);
@@ -139,7 +132,7 @@ internal sealed class MainForm : Form
         base.OnFormClosing(e);
     }
 
-    private static Label MakeLabel(string text, Color fg, Font font, Padding margin)
+    private static Label MakeLabel(string text, Color fg, Font font, Padding margin, int width = 400, int height = 24)
     {
         return new Label
         {
@@ -147,9 +140,41 @@ internal sealed class MainForm : Form
             ForeColor = fg,
             Font = font,
             BackColor = Color.Transparent,
-            AutoSize = true,
+            AutoSize = false,
+            Width = width,
+            Height = height,
+            TextAlign = ContentAlignment.MiddleCenter,
             Margin = margin,
         };
+    }
+
+    private static int CalcLabelHeight(string text, Font font)
+    {
+        int lines = text.Count(c => c == '\n') + 1;
+        int lineHeight = TextRenderer.MeasureText("Ag가", font).Height;
+        return lines * lineHeight + 10;
+    }
+
+    private static string BreakPath(string path, Font font, int maxWidth)
+    {
+        int safeWidth = maxWidth - 10;
+        var sb = new System.Text.StringBuilder();
+        string remaining = path;
+        while (remaining.Length > 0)
+        {
+            int lo = 1, hi = remaining.Length, fit = 1;
+            while (lo <= hi)
+            {
+                int mid = (lo + hi) / 2;
+                int w = TextRenderer.MeasureText(remaining[..mid], font).Width;
+                if (w <= safeWidth) { fit = mid; lo = mid + 1; }
+                else hi = mid - 1;
+            }
+            sb.Append(remaining[..fit]);
+            remaining = remaining[fit..];
+            if (remaining.Length > 0) sb.Append('\n');
+        }
+        return sb.ToString();
     }
 
     private static Button MakeButton(string text, Color bg, Color fg, Padding margin)
@@ -163,16 +188,10 @@ internal sealed class MainForm : Form
             Font = new Font("Segoe UI", 10f, FontStyle.Bold),
             Cursor = Cursors.Hand,
             Margin = margin,
-            Width = 220,
-            Height = 36,
+            Width = 400,
+            Height = 60,
             FlatAppearance = { BorderSize = 0 },
         };
     }
 
-    private static string ShortPath(string path, int maxLen = 42)
-    {
-        if (path.Length <= maxLen) return path;
-        string[] parts = path.Replace('\\', '/').Split('/');
-        return parts.Length > 2 ? ".../" + string.Join("/", parts[^2..]) : path;
-    }
 }
