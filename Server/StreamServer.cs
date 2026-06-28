@@ -16,8 +16,13 @@ internal sealed class StreamServer
 
     public void Start(string serveDir)
     {
-        Stop();
+        Start();
         ServeDir = serveDir;
+    }
+
+    public void Start()
+    {
+        Stop();
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
@@ -51,6 +56,8 @@ internal sealed class StreamServer
             }
         }, token);
     }
+
+    public void SetServeDir(string serveDir) => ServeDir = serveDir;
 
     public void Stop()
     {

@@ -20,18 +20,21 @@ internal sealed class MainForm : Form
     private static string S(string ko, string en) => IsKo ? ko : en;
 
     private readonly StreamServer _server;
-    private readonly bool[,] _qrMatrix;
+    private bool[,]? _qrMatrix;
     private Label _dirLabel = null!;
+    private Label _qrLabel = null!;
+    private Panel _qrPanel = null!;
+    private FlowLayoutPanel _layout = null!;
 
     public MainForm(StreamServer server, string ip)
     {
         _server = server;
         string authUrl = $"http://{ip}:{server.ActualPort}/?auth={server.Auth.Token}";
         _qrMatrix = QrCode.Encode(authUrl);
-        BuildUI(ip, server.ActualPort);
+        BuildUI();
     }
 
-    private void BuildUI(string ip, int port)
+    private void BuildUI()
     {
         Text = S("홈 스트리밍", "Home Streaming");
         BackColor = BgColor;
@@ -40,7 +43,7 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
 
-        var layout = new FlowLayoutPanel
+        _layout = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
@@ -52,78 +55,87 @@ internal sealed class MainForm : Form
 
         const int contentWidth = 400;
 
-        layout.Controls.Add(MakeLabel(S("QR 스캔 또는 주소로 접속", "Scan QR or enter address"),
-            TextMuted, new Font("Segoe UI", 10f), new Padding(0, 0, 0, 14), contentWidth));
+        _qrLabel = MakeLabel(S("QR 스캔 또는 주소로 접속", "Scan QR or enter address"),
+            TextMuted, new Font("Segoe UI", 10f), new Padding(0, 0, 0, 14), contentWidth);
+        _layout.Controls.Add(_qrLabel);
 
         // QR canvas
-        int n = _qrMatrix.GetLength(0);
-        int cell = Math.Max(1, contentWidth / n);
-        int qrSize = cell * n;
-        int qrMargin = Math.Max(0, (contentWidth - qrSize) / 2);
-        var qrPanel = new Panel
+        _qrPanel = new Panel
         {
-            Width = qrSize,
-            Height = qrSize,
+            Width = contentWidth,
+            Height = contentWidth,
             BackColor = BgColor,
-            Margin = new Padding(qrMargin, 0, 0, 10),
+            Margin = new Padding(0, 0, 0, 10),
         };
-        qrPanel.Paint += (_, e) =>
+        _qrPanel.Paint += (_, e) =>
         {
+            int n = _qrMatrix!.GetLength(0);
+            int cell = Math.Max(1, contentWidth / n);
+            int qrSize = cell * n;
+            int ox = (contentWidth - qrSize) / 2;
+            int oy = (contentWidth - qrSize) / 2;
             using var brush = new SolidBrush(QrModule);
             for (int r = 0; r < n; r++)
                 for (int c = 0; c < n; c++)
                     if (_qrMatrix[r, c])
-                        e.Graphics.FillRectangle(brush, c * cell, r * cell, cell, cell);
+                        e.Graphics.FillRectangle(brush, ox + c * cell, oy + r * cell, cell, cell);
         };
-        layout.Controls.Add(qrPanel);
+        _layout.Controls.Add(_qrPanel);
 
         var dirFont = new Font("Segoe UI", 10f);
-        string dirText = BreakPath(_server.ServeDir, dirFont, contentWidth);
+        string initialDirText = string.IsNullOrEmpty(_server.ServeDir)
+            ? S("선택된 폴더 없음", "No folder selected")
+            : BreakPath(_server.ServeDir, dirFont, contentWidth);
         _dirLabel = new Label
         {
-            Text = dirText,
+            Text = initialDirText,
             ForeColor = TextMuted,
             Font = dirFont,
             BackColor = Color.Transparent,
             AutoSize = false,
             Width = contentWidth,
-            Height = CalcLabelHeight(dirText, dirFont),
+            Height = CalcLabelHeight(initialDirText, dirFont),
             TextAlign = ContentAlignment.TopCenter,
             Margin = new Padding(0, 22, 0, 14),
         };
-        layout.Controls.Add(_dirLabel);
+        _layout.Controls.Add(_dirLabel);
 
-        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, TextMuted, new Padding(0, 0, 0, 10));
+        var changeBtn = MakeButton(
+            string.IsNullOrEmpty(_server.ServeDir) ? S("폴더 선택", "Select Folder") : S("폴더 변경", "Change Folder"),
+            AccentDark, TextMuted, new Padding(0, 0, 0, 10));
         changeBtn.Click += (_, _) =>
         {
             try
             {
-                using var dlg = new FolderBrowserDialog { InitialDirectory = _server.ServeDir };
+                string? initial = string.IsNullOrEmpty(_server.ServeDir) ? null : _server.ServeDir;
+                using var dlg = new FolderBrowserDialog();
+                if (initial != null) dlg.InitialDirectory = initial;
                 TopMost = true;
                 var result = dlg.ShowDialog(this);
                 TopMost = false;
-                if (result == DialogResult.OK && dlg.SelectedPath != _server.ServeDir)
-                {
-                    _server.Stop();
-                    _server.Start(dlg.SelectedPath);
-                    string newText = BreakPath(_server.ServeDir, _dirLabel.Font, _dirLabel.Width);
-                    _dirLabel.Text = newText;
-                    _dirLabel.Height = CalcLabelHeight(newText, _dirLabel.Font);
-                }
+                if (result != DialogResult.OK || dlg.SelectedPath == _server.ServeDir) return;
+
+                _server.SetServeDir(dlg.SelectedPath);
+                _qrPanel.Invalidate();
+
+                string newText = BreakPath(_server.ServeDir, _dirLabel.Font, _dirLabel.Width);
+                _dirLabel.Text = newText;
+                _dirLabel.Height = CalcLabelHeight(newText, _dirLabel.Font);
+                changeBtn.Text = S("폴더 변경", "Change Folder");
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.ToString(), "오류");
             }
         };
-        layout.Controls.Add(changeBtn);
+        _layout.Controls.Add(changeBtn);
 
-        layout.Controls.Add(MakeLabel(
+        _layout.Controls.Add(MakeLabel(
             S("이 창을 X(닫기)로 닫으면 서버가 꺼집니다", "Closing this window will stop the server"),
             TextDim, new Font("Segoe UI", 9f), new Padding(0, 4, 0, 0), contentWidth, height: 40));
 
-        Controls.Add(layout);
-        ClientSize = new Size(layout.PreferredSize.Width, layout.PreferredSize.Height);
+        Controls.Add(_layout);
+        ClientSize = new Size(_layout.PreferredSize.Width, _layout.PreferredSize.Height);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

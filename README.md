@@ -52,8 +52,8 @@
 ## 빠른 시작
 
 1. [홈페이지](https://gethomestream.com/)에서 `HomeStream.exe` 다운로드
-2. 더블클릭으로 실행
-3. **영상 폴더**를 선택하면 QR 코드와 접속 주소가 표시됨
+2. 더블클릭으로 실행 — QR 코드가 즉시 표시됨
+3. **폴더 선택** 버튼을 눌러 영상 폴더 지정
 4. 폰 카메라로 QR 스캔 → 폴더·영상 목록에서 재생
 
 > 창을 닫으면 서버가 꺼집니다. 켜둔 동안만 접속됩니다(최소화는 OK).
@@ -62,7 +62,7 @@
 
 ## 설정
 
-영상 폴더는 앱 실행 시 다이얼로그에서 선택합니다. 환경변수로도 지정할 수 있습니다.
+영상 폴더는 앱 안의 **폴더 선택** 버튼으로 변경할 수 있습니다. 환경변수로 미리 지정할 수도 있습니다.
 
 | 환경변수 | 설명 |
 |------|------|
@@ -72,31 +72,58 @@
 
 ## 소스에서 개발 실행
 
-**PowerShell**
-```powershell
-# 폴더 다이얼로그 없이 바로 실행
-$env:SERVE_DIR = "C:\Videos"; dotnet run
+### PowerShell
 
-# 또는 빌드 후 exe 직접 실행
+```powershell
+# 기본 실행 — 앱 내 "폴더 선택" 버튼으로 선택
+dotnet run
+
+# 폴더를 미리 지정해서 바로 스트리밍
+$env:SERVE_DIR = "C:\Videos"; dotnet run
+```
+
+빌드 후 exe 직접 실행:
+
+```powershell
 dotnet build
+.\bin\Debug\net8.0-windows\HomeStream.exe
+
+# SERVE_DIR 지정 시
 $env:SERVE_DIR = "C:\Videos"; .\bin\Debug\net8.0-windows\HomeStream.exe
 ```
 
-**Git Bash / bash**
-```bash
-SERVE_DIR="C:/Videos" dotnet run
+### Git Bash / bash
 
-# 또는 빌드 후 exe 직접 실행
+```bash
+# 기본 실행
+dotnet run
+
+# SERVE_DIR 지정 시
+SERVE_DIR="C:/Videos" dotnet run
+```
+
+빌드 후 exe 직접 실행:
+
+```bash
 dotnet build
+./bin/Debug/net8.0-windows/HomeStream.exe
+
+# SERVE_DIR 지정 시
 SERVE_DIR="C:/Videos" ./bin/Debug/net8.0-windows/HomeStream.exe
 ```
 
-**cmd**
+### cmd
+
 ```cmd
+:: 기본 실행
+dotnet run
+
+:: SERVE_DIR 지정 시
 set SERVE_DIR=C:\Videos && dotnet run
 ```
 
-> `SERVE_DIR` 없이 실행하면 시작 시 폴더 선택 다이얼로그가 표시됩니다.
+> `SERVE_DIR` 없이 실행하면 앱이 열리자마자 QR 코드가 표시됩니다. 앱 안의 **폴더 선택** 버튼으로 폴더를 고르면 즉시 스트리밍이 시작됩니다.  
+> `SERVE_DIR`을 지정하면 폴더 선택 없이 바로 스트리밍됩니다.
 
 ## 배포용 빌드
 
