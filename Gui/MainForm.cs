@@ -55,7 +55,7 @@ internal sealed class MainForm : Form
 
         const int contentWidth = 400;
 
-        _qrLabel = MakeLabel(S("QR 스캔 또는 주소로 접속", "Scan QR or enter address"),
+        _qrLabel = MakeLabel(S("QR 스캔 후 뜨는 주소를 터치하세요", "Scan QR, then tap the address that appears"),
             TextMuted, new Font("Segoe UI", 10f), new Padding(0, 0, 0, 14), contentWidth);
         _layout.Controls.Add(_qrLabel);
 

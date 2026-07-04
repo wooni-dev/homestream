@@ -16,7 +16,7 @@ static readonly Color QrModule      = ColorTranslator.FromHtml("#ececf1");
 ## MainForm 레이아웃 (위에서 아래 순서)
 
 ```
-[Label]  "QR 스캔 또는 주소로 접속"  색상: TextMuted  패딩: 상22 하6
+[Label]  "QR 스캔 후 뜨는 주소를 터치하세요"  색상: TextMuted  패딩: 상22 하6
 [Panel]  QR 캔버스  (OnPaint로 직접 렌더링)
 [Button] "주소 복사"  bg: AccentColor  fg: BgColor
 [Label]  "서비스 중인 폴더"  색상: TextDim  크기: 8pt
