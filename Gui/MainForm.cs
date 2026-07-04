@@ -83,9 +83,7 @@ internal sealed class MainForm : Form
         _layout.Controls.Add(_qrPanel);
 
         var dirFont = new Font("Segoe UI", 10f);
-        string initialDirText = string.IsNullOrEmpty(_server.ServeDir)
-            ? S("선택된 폴더 없음", "No folder selected")
-            : BreakPath(_server.ServeDir, dirFont, contentWidth);
+        string initialDirText = BreakPath(_server.ServeDir, dirFont, contentWidth);
         _dirLabel = new Label
         {
             Text = initialDirText,
@@ -100,16 +98,12 @@ internal sealed class MainForm : Form
         };
         _layout.Controls.Add(_dirLabel);
 
-        var changeBtn = MakeButton(
-            string.IsNullOrEmpty(_server.ServeDir) ? S("폴더 선택", "Select Folder") : S("폴더 변경", "Change Folder"),
-            AccentDark, TextMuted, new Padding(0, 0, 0, 10));
+        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, TextMuted, new Padding(0, 0, 0, 10));
         changeBtn.Click += (_, _) =>
         {
             try
             {
-                string? initial = string.IsNullOrEmpty(_server.ServeDir) ? null : _server.ServeDir;
-                using var dlg = new FolderBrowserDialog();
-                if (initial != null) dlg.InitialDirectory = initial;
+                using var dlg = new FolderBrowserDialog { InitialDirectory = _server.ServeDir };
                 TopMost = true;
                 var result = dlg.ShowDialog(this);
                 TopMost = false;
@@ -121,7 +115,6 @@ internal sealed class MainForm : Form
                 string newText = BreakPath(_server.ServeDir, _dirLabel.Font, _dirLabel.Width);
                 _dirLabel.Text = newText;
                 _dirLabel.Height = CalcLabelHeight(newText, _dirLabel.Font);
-                changeBtn.Text = S("폴더 변경", "Change Folder");
             }
             catch (Exception ex)
             {

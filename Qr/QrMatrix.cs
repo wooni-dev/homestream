@@ -68,7 +68,6 @@ public static class QrCode
 
     private static void PlaceFinder(sbyte[,] mat, bool[,] func, int row, int col)
     {
-        int[] pattern = { 1, 1, 1, 1, 1, 1, 1 };
         int[][] rows = {
             new[]{1,1,1,1,1,1,1},
             new[]{1,0,0,0,0,0,1},
