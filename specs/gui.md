@@ -84,16 +84,17 @@ static string ShortPath(string path, int maxLen = 42) {
 }
 ```
 
-## 폴더 선택 다이얼로그 (초기 실행)
+## 폴더 선택 창 (초기 실행)
 
-환경변수 `SERVE_DIR`이 없거나 유효하지 않을 때 표시.
+환경변수 `SERVE_DIR`이 없거나 유효하지 않을 때, 탐색기 다이얼로그를 바로 띄우지 않고
+앱과 같은 다크 테마의 `FolderSelectForm`을 먼저 표시한다. 이 창의 "폴더 선택" 버튼을
+눌러야 `FolderBrowserDialog`(탐색기)가 열린다. 폴더를 고르면 창이 닫히고 서버가
+시작되며 QR 창(`MainForm`)이 뜬다. 취소 시 앱 종료.
 
 ```csharp
-using var dlg = new FolderBrowserDialog {
-    Description = isKo ? "스트리밍할 영상 폴더를 선택하세요" : "Select video folder to stream"
-};
-if (dlg.ShowDialog() != DialogResult.OK) return; // 취소 시 종료
-serveDir = dlg.SelectedPath;
+using var folderForm = new FolderSelectForm();
+if (folderForm.ShowDialog() != DialogResult.OK) return; // 취소 시 종료
+serveDir = folderForm.SelectedPath;
 ```
 
 ## 창 닫기

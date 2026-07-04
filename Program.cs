@@ -15,10 +15,15 @@ internal static class Program
         if (!string.IsNullOrEmpty(serveDir) && !Directory.Exists(serveDir))
             serveDir = null;
 
+        if (string.IsNullOrEmpty(serveDir))
+        {
+            using var folderForm = new FolderSelectForm();
+            if (folderForm.ShowDialog() != DialogResult.OK) return;
+            serveDir = folderForm.SelectedPath;
+        }
+
         var server = new StreamServer();
-        server.Start();
-        if (!string.IsNullOrEmpty(serveDir))
-            server.SetServeDir(serveDir);
+        server.Start(serveDir);
 
         string ip = StreamServer.GetLanIp();
         string testUrl = $"http://{ip}:{server.ActualPort}/?auth={server.Auth.Token}";
