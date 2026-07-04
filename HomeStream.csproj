@@ -5,7 +5,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <ApplicationIcon>tv.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>

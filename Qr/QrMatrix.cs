@@ -121,8 +121,8 @@ public static class QrCode
     {
         for (int i = 0; i < 9; i++)
         {
-            Reserve(mat, func, 8, i);
-            Reserve(mat, func, i, 8);
+            if (i != 6) Reserve(mat, func, 8, i); // (8,6) = timing module, keep dark
+            if (i != 6) Reserve(mat, func, i, 8); // (6,8) = timing module, keep dark
         }
         for (int i = 0; i < 8; i++)
         {
@@ -207,23 +207,23 @@ public static class QrCode
         };
         int fmt = table[mask];
 
-        // Around top-left finder
-        int[] cols = { 0, 1, 2, 3, 4, 5, 7, 8 };
-        int[] rows8 = { 8, 8, 8, 8, 8, 8, 8, 7 };
-        for (int i = 0; i < 8; i++)
-        {
-            bool b = ((fmt >> (14 - i)) & 1) == 1;
-            mat[rows8[i], cols[i]] = b;
-            mat[cols[i], 8] = b;
-        }
-        // Bottom-left and top-right
-        for (int i = 0; i < 7; i++)
-        {
-            bool b = ((fmt >> i) & 1) == 1;
-            mat[n - 1 - i, 8] = b;
-            mat[8, n - 7 + i] = b;
-        }
-        mat[8, n - 8] = true; // dark module
+        // First copy: near top-left finder. Bit 14 (MSB) nearest the finder, descending.
+        for (int i = 0; i <= 5; i++)
+            mat[8, i] = ((fmt >> (14 - i)) & 1) == 1; // cols 0-5: bits 14-9
+        mat[8, 7] = ((fmt >> 8) & 1) == 1; // col 7: bit 8
+        mat[8, 8] = ((fmt >> 7) & 1) == 1; // col 8: bit 7
+        mat[7, 8] = ((fmt >> 6) & 1) == 1; // row 7, col 8: bit 6
+        for (int i = 0; i <= 5; i++)        // col 8, rows 0-5: bits 0-5
+            mat[i, 8] = ((fmt >> i) & 1) == 1;
+
+        // Second copy: bottom-left (col 8) continuing to top-right (row 8), same bit order
+        for (int i = 0; i <= 6; i++)        // col 8, rows n-1 down to n-7: bits 14-8
+            mat[n - 1 - i, 8] = ((fmt >> (14 - i)) & 1) == 1;
+        mat[8, n - 8] = ((fmt >> 7) & 1) == 1; // col n-8: bit 7
+        for (int i = 0; i <= 6; i++)        // row 8, cols n-7 to n-1: bits 6-0
+            mat[8, n - 7 + i] = ((fmt >> (6 - i)) & 1) == 1;
+
+        mat[n - 8, 8] = true; // dark module (always 1) — spec position is (n-8, 8), not (8, n-8)
     }
 
     private static int CalcPenalty(bool[,] mat, int n)

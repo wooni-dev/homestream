@@ -74,11 +74,11 @@ internal sealed class MainForm : Form
             int qrSize = cell * n;
             int ox = (contentWidth - qrSize) / 2;
             int oy = (contentWidth - qrSize) / 2;
-            using var brush = new SolidBrush(QrModule);
+            e.Graphics.FillRectangle(Brushes.White, ox, oy, qrSize, qrSize);
             for (int r = 0; r < n; r++)
                 for (int c = 0; c < n; c++)
                     if (_qrMatrix[r, c])
-                        e.Graphics.FillRectangle(brush, ox + c * cell, oy + r * cell, cell, cell);
+                        e.Graphics.FillRectangle(Brushes.Black, ox + c * cell, oy + r * cell, cell, cell);
         };
         _layout.Controls.Add(_qrPanel);
 
