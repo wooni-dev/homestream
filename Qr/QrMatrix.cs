@@ -1,10 +1,8 @@
 namespace HomeStream.Qr;
 
-public enum ErrorCorrectionLevel { L, M, Q, H }
-
-public static class QrCode
+internal static class QrCode
 {
-    public static bool[,] Encode(string url, ErrorCorrectionLevel ecl = ErrorCorrectionLevel.M)
+    public static bool[,] Encode(string url)
     {
         var (dataCw, version, ecCount) = QrEncoder.Encode(url);
 
@@ -31,7 +29,7 @@ public static class QrCode
         for (int m = 0; m < 8; m++)
         {
             var candidate = ApplyMask(mat, func, n, m);
-            WriteFormat(candidate, n, ecl, m);
+            WriteFormat(candidate, n, m);
             int penalty = CalcPenalty(candidate, n);
             if (penalty < bestPenalty)
             {
@@ -188,23 +186,9 @@ public static class QrCode
         0b100010111111001, 0b100000011001110, 0b100111110010111, 0b100101010100000
     };
 
-    private static void WriteFormat(bool[,] mat, int n, ErrorCorrectionLevel ecl, int mask)
+    private static void WriteFormat(bool[,] mat, int n, int mask)
     {
-        int[] table = ecl switch
-        {
-            ErrorCorrectionLevel.L => new[] {
-                0b111011111000100, 0b111001011110011, 0b111110110101010, 0b111100010011101,
-                0b110011000101111, 0b110001100011000, 0b110110001000001, 0b110100101110110 },
-            ErrorCorrectionLevel.M => FormatInfoM,
-            ErrorCorrectionLevel.Q => new[] {
-                0b011010101011111, 0b011000001101000, 0b011111100110001, 0b011101000000110,
-                0b010010010110100, 0b010000110000011, 0b010111011011010, 0b010101111101101 },
-            ErrorCorrectionLevel.H => new[] {
-                0b001011010001001, 0b001001110111110, 0b001110011100111, 0b001100111010000,
-                0b000011101100010, 0b000001001010101, 0b000110100001100, 0b000100000111011 },
-            _ => FormatInfoM
-        };
-        int fmt = table[mask];
+        int fmt = FormatInfoM[mask];
 
         // First copy: near top-left finder. Bit 14 (MSB) nearest the finder, descending.
         for (int i = 0; i <= 5; i++)

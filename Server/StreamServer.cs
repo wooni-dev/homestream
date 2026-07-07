@@ -85,7 +85,6 @@ internal sealed class StreamServer
 
     private sealed class HttpRequest
     {
-        public string Method = "";
         public string RawPath = "";
         public string UrlPath = "";
         public string Query = "";
@@ -96,20 +95,16 @@ internal sealed class StreamServer
     {
         // Read until \r\n\r\n
         var buf = new List<byte>(4096);
-        var tmp = new byte[1];
-        int idle = 0;
+        var chunk = new byte[4096];
         while (buf.Count < 16384)
         {
-            int n = stream.Read(tmp, 0, 1);
-            if (n == 0) { idle++; if (idle > 3) break; continue; }
-            idle = 0;
-            buf.Add(tmp[0]);
-            if (buf.Count >= 4)
-            {
-                int e = buf.Count - 1;
-                if (buf[e] == '\n' && buf[e - 1] == '\r' && buf[e - 2] == '\n' && buf[e - 3] == '\r')
-                    break;
-            }
+            int n = stream.Read(chunk, 0, chunk.Length);
+            if (n == 0) break; // connection closed
+            for (int i = 0; i < n; i++) buf.Add(chunk[i]);
+
+            int e = buf.Count - 1;
+            if (e >= 3 && buf[e] == '\n' && buf[e - 1] == '\r' && buf[e - 2] == '\n' && buf[e - 3] == '\r')
+                break;
         }
 
         string rawHeaders = Encoding.ASCII.GetString(buf.ToArray());
@@ -134,7 +129,6 @@ internal sealed class StreamServer
 
         return new HttpRequest
         {
-            Method = parts[0],
             RawPath = rawPath,
             UrlPath = Uri.UnescapeDataString(urlPath),
             Query = query,

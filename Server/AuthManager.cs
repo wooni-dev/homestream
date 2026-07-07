@@ -31,8 +31,12 @@ internal sealed class AuthManager
 
     public (string sid, string setCookie) CreateSession()
     {
+        long now = Environment.TickCount64;
+        foreach (var expired in _sessions.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToArray())
+            _sessions.Remove(expired);
+
         string sid = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLower();
-        _sessions[sid] = Environment.TickCount64 + CookieMaxAgeMs;
+        _sessions[sid] = now + CookieMaxAgeMs;
         string setCookie = $"{CookieName}={sid}; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax";
         return (sid, setCookie);
     }

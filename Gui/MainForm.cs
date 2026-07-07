@@ -1,24 +1,13 @@
 using System.Drawing;
-using System.Globalization;
 using System.Windows.Forms;
 using HomeStream.Qr;
 using HomeStream.Server;
+using static HomeStream.Gui.GuiTheme;
 
 namespace HomeStream.Gui;
 
 internal sealed class MainForm : Form
 {
-    private static readonly Color BgColor = ColorTranslator.FromHtml("#0e0e12");
-    private static readonly Color TextMuted = ColorTranslator.FromHtml("#9a9aae");
-    private static readonly Color TextDim = ColorTranslator.FromHtml("#55556a");
-    private static readonly Color AccentDark = ColorTranslator.FromHtml("#2a2540");
-    private static readonly Color QrModule = ColorTranslator.FromHtml("#ececf1");
-
-    private static readonly bool IsKo =
-        CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ko";
-
-    private static string S(string ko, string en) => IsKo ? ko : en;
-
     private readonly StreamServer _server;
     private bool[,]? _qrMatrix;
     private Label _dirLabel = null!;
@@ -98,18 +87,16 @@ internal sealed class MainForm : Form
         };
         _layout.Controls.Add(_dirLabel);
 
-        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, TextMuted, new Padding(0, 0, 0, 10));
+        var changeBtn = MakeButton(S("폴더 변경", "Change Folder"), AccentDark, TextMuted, contentWidth,
+            margin: new Padding(0, 0, 0, 10));
         changeBtn.Click += (_, _) =>
         {
             try
             {
-                using var dlg = new FolderBrowserDialog { InitialDirectory = _server.ServeDir };
-                TopMost = true;
-                var result = dlg.ShowDialog(this);
-                TopMost = false;
-                if (result != DialogResult.OK || dlg.SelectedPath == _server.ServeDir) return;
+                string? path = PickFolder(this, _server.ServeDir);
+                if (path == null || path == _server.ServeDir) return;
 
-                _server.SetServeDir(dlg.SelectedPath);
+                _server.SetServeDir(path);
                 _qrPanel.Invalidate();
 
                 string newText = BreakPath(_server.ServeDir, _dirLabel.Font, _dirLabel.Width);
@@ -180,23 +167,6 @@ internal sealed class MainForm : Form
             if (remaining.Length > 0) sb.Append('\n');
         }
         return sb.ToString();
-    }
-
-    private static Button MakeButton(string text, Color bg, Color fg, Padding margin)
-    {
-        return new Button
-        {
-            Text = text,
-            BackColor = bg,
-            ForeColor = fg,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            Margin = margin,
-            Width = 400,
-            Height = 60,
-            FlatAppearance = { BorderSize = 0 },
-        };
     }
 
 }

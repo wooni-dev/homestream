@@ -42,33 +42,38 @@ internal static class HtmlRenderer
         string title = parts.Length > 0 ? parts[^1] : "홈";
         string count = $"폴더 {dirs.Length} · 영상 {vids.Length}";
 
-        string html = $"""
-            <!DOCTYPE html><html lang="ko"><head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-            <title>{WebUtility.HtmlEncode(title)}</title><style>{PageCss.Value}</style></head><body>
+        string content = $"""
             <header><h1>{WebUtility.HtmlEncode(title)}</h1><div class="sub">{count}</div>
             <div class="crumb">{crumb}</div></header>
-            <div class="list">{body}</div></body></html>
+            <div class="list">{body}</div>
             """;
-        return Encoding.UTF8.GetBytes(html);
+        return Encoding.UTF8.GetBytes(WrapPage(title, null, content));
     }
 
     public static byte[] RenderPlayer(string urlPath)
     {
         string name = Uri.UnescapeDataString(urlPath.TrimEnd('/').Split('/')[^1]);
-        string html = $"""
-            <!DOCTYPE html><html lang="ko"><head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-            <title>{WebUtility.HtmlEncode(name)}</title><style>{PageCss.Value}</style></head><body class="pbody">
+        string content = $"""
             <div class="ptop"><a class="back" href="javascript:history.back()">&lsaquo; 뒤로</a>
             <div class="ptitle">{WebUtility.HtmlEncode(name)}</div></div>
             <div class="pwrap">
             <video controls autoplay playsinline preload="metadata" src="{urlPath}"></video>
-            </div></body></html>
+            </div>
             """;
-        return Encoding.UTF8.GetBytes(html);
+        return Encoding.UTF8.GetBytes(WrapPage(name, "pbody", content));
+    }
+
+    private static string WrapPage(string title, string? bodyClass, string content)
+    {
+        string classAttr = string.IsNullOrEmpty(bodyClass) ? "" : $" class=\"{bodyClass}\"";
+        return $"""
+            <!DOCTYPE html><html lang="ko"><head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+            <title>{WebUtility.HtmlEncode(title)}</title><style>{PageCss.Value}</style></head><body{classAttr}>
+            {content}
+            </body></html>
+            """;
     }
 
     public static bool IsVideoFile(string path) =>

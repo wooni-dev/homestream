@@ -1,20 +1,11 @@
 using System.Drawing;
-using System.Globalization;
 using System.Windows.Forms;
+using static HomeStream.Gui.GuiTheme;
 
 namespace HomeStream.Gui;
 
 internal sealed class FolderSelectForm : Form
 {
-    private static readonly Color BgColor = ColorTranslator.FromHtml("#0e0e12");
-    private static readonly Color TextMuted = ColorTranslator.FromHtml("#9a9aae");
-    private static readonly Color AccentDark = ColorTranslator.FromHtml("#2a2540");
-
-    private static readonly bool IsKo =
-        CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ko";
-
-    private static string S(string ko, string en) => IsKo ? ko : en;
-
     public string SelectedPath { get; private set; } = "";
 
     public FolderSelectForm()
@@ -52,27 +43,13 @@ internal sealed class FolderSelectForm : Form
         };
         layout.Controls.Add(label);
 
-        var selectBtn = new Button
-        {
-            Text = S("폴더 선택", "Select Folder"),
-            BackColor = AccentDark,
-            ForeColor = TextMuted,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            Width = contentWidth,
-            Height = 60,
-            FlatAppearance = { BorderSize = 0 },
-        };
+        var selectBtn = MakeButton(S("폴더 선택", "Select Folder"), AccentDark, TextMuted, contentWidth);
         selectBtn.Click += (_, _) =>
         {
-            using var dlg = new FolderBrowserDialog();
-            TopMost = true;
-            var result = dlg.ShowDialog(this);
-            TopMost = false;
-            if (result != DialogResult.OK) return;
+            string? path = PickFolder(this);
+            if (path == null) return;
 
-            SelectedPath = dlg.SelectedPath;
+            SelectedPath = path;
             DialogResult = DialogResult.OK;
             Close();
         };
