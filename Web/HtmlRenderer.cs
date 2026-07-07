@@ -57,7 +57,7 @@ internal static class HtmlRenderer
             <div class="ptop"><a class="back" href="javascript:history.back()">&lsaquo; 뒤로</a>
             <div class="ptitle">{WebUtility.HtmlEncode(name)}</div></div>
             <div class="pwrap">
-            <video controls autoplay playsinline preload="metadata" src="{urlPath}"></video>
+            <video controls playsinline preload="metadata" src="{urlPath}"></video>
             </div>
             """;
         return Encoding.UTF8.GetBytes(WrapPage(name, "pbody", content));
