@@ -1,25 +1,31 @@
 # HomeStream
 
-같은 Wi-Fi의 휴대폰에서 PC/USB 영상을 브라우저로 스트리밍하는 로컬 HTTP 서버 + Windows 데스크탑 앱.
+같은 Wi-Fi의 휴대폰에서 PC/USB 영상을 브라우저로 스트리밍하는 로컬 HTTP 서버 + Windows/macOS 데스크탑 앱.
 
 ## 현재 상태
 
 C# (.NET 8) 재작성 완료. Python 소스는 삭제됨.
+`HomeStream.sln` 아래 3개 프로젝트로 구성: `Core`(서버·QR·HTML 렌더링, 순수 BCL), `Windows`(WinForms GUI), `Mac`(Avalonia GUI).
 랜딩 페이지: https://gethomestream.com/ (Cloudflare Pages)
 
 ## 기술 스팩
 
 - **언어**: C# (.NET 8+)
-- **외부 라이브러리**: 없음 — .NET BCL만 사용
-- **GUI**: WinForms (`System.Windows.Forms`)
-- **HTTP 서버**: `System.Net.HttpListener`
-- **QR 코드**: 직접 구현 (외부 라이브러리 금지)
-- **빌드 결과물**: 단일 실행파일 (`HomeStream.exe`)
+- **외부 라이브러리**: Windows는 없음(.NET BCL만 사용), macOS는 GUI를 위해 Avalonia 사용 — `Core` 프로젝트(서버/QR/HTML)는 두 플랫폼 공통으로 외부 라이브러리 없음
+- **GUI**: Windows는 WinForms(`System.Windows.Forms`), macOS는 Avalonia
+- **HTTP 서버**: `TcpListener` 기반 직접 구현 (`Core/Server`)
+- **QR 코드**: 직접 구현 (외부 라이브러리 금지, `Core/Qr`)
+- **빌드 결과물**: 플랫폼별 단일 실행파일 (`HomeStream.exe` / macOS `HomeStream`)
 
 ## 빌드 명령
 
 ```
-dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+# Windows
+dotnet publish Windows/HomeStream.Windows.csproj -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+
+# macOS
+dotnet publish Mac/HomeStream.Mac.csproj -r osx-arm64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+dotnet publish Mac/HomeStream.Mac.csproj -r osx-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
 ```
 
 ## 성공 기준
@@ -52,7 +58,7 @@ dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configur
 - 지원 확장자: `.mp4 .mkv .avi .mov .wmv .m4v`
 - 파일 크기 표시 (MB/GB)
 
-### WinForms GUI
+### 데스크탑 GUI (Windows: WinForms, macOS: Avalonia)
 - 다크 배경 (`#0e0e12`)
 - QR 코드 캔버스 (흰 모듈 `#ececf1`, 여백 없음)
 - "주소 복사" 버튼 (클릭 시 1.5초간 "복사됨!" 표시)

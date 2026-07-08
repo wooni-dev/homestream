@@ -6,5 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>tv.ico</ApplicationIcon>
+    <AssemblyName>HomeStream</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\HomeStream.Core.csproj" />
+  </ItemGroup>
 </Project>

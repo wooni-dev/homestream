@@ -1,20 +1,17 @@
 using System.Drawing;
-using System.Globalization;
 using System.Windows.Forms;
+using HomeStream.Core;
 
 namespace HomeStream.Gui;
 
 internal static class GuiTheme
 {
-    public static readonly Color BgColor = ColorTranslator.FromHtml("#0e0e12");
-    public static readonly Color TextMuted = ColorTranslator.FromHtml("#9a9aae");
-    public static readonly Color TextDim = ColorTranslator.FromHtml("#55556a");
-    public static readonly Color AccentDark = ColorTranslator.FromHtml("#2a2540");
+    public static readonly Color BgColor = ColorTranslator.FromHtml(Theme.BgColorHex);
+    public static readonly Color TextMuted = ColorTranslator.FromHtml(Theme.TextMutedHex);
+    public static readonly Color TextDim = ColorTranslator.FromHtml(Theme.TextDimHex);
+    public static readonly Color AccentDark = ColorTranslator.FromHtml(Theme.AccentDarkHex);
 
-    public static readonly bool IsKo =
-        CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ko";
-
-    public static string S(string ko, string en) => IsKo ? ko : en;
+    public static string S(string ko, string en) => Theme.S(ko, en);
 
     public static Button MakeButton(string text, Color bg, Color fg, int width, int height = 60, Padding? margin = null)
     {

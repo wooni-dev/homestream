@@ -17,7 +17,7 @@
 
 **[홈페이지에서 다운로드](https://gethomestream.com/)** (Windows 단일 실행파일)
 
-또는 [GitHub Releases](https://github.com/wooni-dev/homestream/releases/latest)에서 직접 받을 수 있습니다.
+또는 [GitHub Releases](https://github.com/wooni-dev/homestream/releases/latest)에서 Windows(win-x64) / macOS(Apple Silicon·Intel) 실행파일을 받을 수 있습니다.
 
 ---
 
@@ -30,7 +30,7 @@
 - **다국어 데스크톱 앱** — OS 언어가 한국어면 한국어, 그 외에는 영어로 표시 (폰 브라우저 화면은 한국어 고정)
 - **단일 실행파일** — .NET 런타임 없이 더블클릭 실행 (self-contained)
 - **읽기 전용** — 파일을 수정·삭제·이동하지 않음
-- **외부 라이브러리 없음** — .NET BCL만 사용
+- **외부 라이브러리** — Windows는 .NET BCL만 사용, macOS는 GUI를 위해 Avalonia 사용
 
 ---
 
@@ -43,7 +43,7 @@
 ## 요구사항
 
 - PC와 휴대폰이 같은 네트워크에 연결 (Wi-Fi 공유기 또는 휴대폰 핫스팟 — 위 참고)
-- Windows x64
+- Windows x64 또는 macOS (Apple Silicon/Intel)
 - 실행파일 사용 시 .NET 런타임 불필요 (self-contained)
 
 ---
@@ -72,54 +72,46 @@
 
 ## 소스에서 개발 실행
 
-### PowerShell
+프로젝트는 `HomeStream.sln` 아래 3개로 나뉘어 있습니다: `Core`(서버·QR 로직), `Windows`(WinForms GUI), `Mac`(Avalonia GUI).
+
+### Windows (PowerShell)
 
 ```powershell
 # 기본 실행 — 폴더 선택 창이 먼저 뜸
-dotnet run
+dotnet run --project Windows/HomeStream.Windows.csproj
 
 # 폴더를 미리 지정해서 바로 스트리밍
-$env:SERVE_DIR = "C:\Videos"; dotnet run
+$env:SERVE_DIR = "C:\Videos"; dotnet run --project Windows/HomeStream.Windows.csproj
 ```
 
 빌드 후 exe 직접 실행:
 
 ```powershell
 dotnet build
-.\bin\Debug\net8.0-windows\HomeStream.exe
+.\Windows\bin\Debug\net8.0-windows\HomeStream.exe
 
 # SERVE_DIR 지정 시
-$env:SERVE_DIR = "C:\Videos"; .\bin\Debug\net8.0-windows\HomeStream.exe
+$env:SERVE_DIR = "C:\Videos"; .\Windows\bin\Debug\net8.0-windows\HomeStream.exe
 ```
 
-### Git Bash / bash
+### Windows (Git Bash / bash)
 
 ```bash
 # 기본 실행
-dotnet run
+dotnet run --project Windows/HomeStream.Windows.csproj
 
 # SERVE_DIR 지정 시
-SERVE_DIR="C:/Videos" dotnet run
+SERVE_DIR="C:/Videos" dotnet run --project Windows/HomeStream.Windows.csproj
 ```
 
-빌드 후 exe 직접 실행:
+### macOS
 
 ```bash
-dotnet build
-./bin/Debug/net8.0-windows/HomeStream.exe
+# 기본 실행 — 폴더 선택 창이 먼저 뜸
+dotnet run --project Mac/HomeStream.Mac.csproj
 
-# SERVE_DIR 지정 시
-SERVE_DIR="C:/Videos" ./bin/Debug/net8.0-windows/HomeStream.exe
-```
-
-### cmd
-
-```cmd
-:: 기본 실행
-dotnet run
-
-:: SERVE_DIR 지정 시
-set SERVE_DIR=C:\Videos && dotnet run
+# 폴더를 미리 지정해서 바로 스트리밍
+SERVE_DIR="/Users/me/Videos" dotnet run --project Mac/HomeStream.Mac.csproj
 ```
 
 ---
@@ -127,7 +119,14 @@ set SERVE_DIR=C:\Videos && dotnet run
 ## 배포용 빌드
 
 ```powershell
-dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+# Windows
+dotnet publish Windows/HomeStream.Windows.csproj -r win-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+
+# macOS (Apple Silicon)
+dotnet publish Mac/HomeStream.Mac.csproj -r osx-arm64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
+
+# macOS (Intel)
+dotnet publish Mac/HomeStream.Mac.csproj -r osx-x64 --self-contained -p:PublishSingleFile=true -p:Configuration=Release
 ```
 
 ---
